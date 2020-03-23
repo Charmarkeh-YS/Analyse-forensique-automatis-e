@@ -1,3 +1,5 @@
+from scapy.all import *
+
 class Trame():
 #--- Classe qui définit une trame réseau tirée d'un pcap par différents paramètres ---
 #--- Prends en paramètre pour la construction UNE trame (pas tout le pcap)
@@ -10,7 +12,7 @@ class Trame():
         print("\nCREATION DE L'OBJET TRAME \n")
         self.mac_src=packet[Ether].src      # Correspond à l'adresse mac source de la trame
         self.mac_dst=packet[Ether].dst      # Correspond à l'adresse mac destination de la trame
-        self.type=packet[Ehter].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
+        self.type=packet[Ether].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
         if(self.type==2048):                # Si c'est une trame IP
             print("TYPE IP \n")
             self.type="IP"                  # On le renomme sous forme d'un string pour pouvoir l'utiliser
@@ -33,6 +35,7 @@ class Trame():
         else:
             print("TYPE INCONNU\n")
         print("OBJET CREE\n")
+        
     def find_protocol(self,packet):
         try:
             if(self.proto==6):
