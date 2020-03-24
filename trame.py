@@ -1,10 +1,6 @@
-from scapy.all import *
-
 class Trame():
 #--- Classe qui définit une trame réseau tirée d'un pcap par différents paramètres ---
 #--- Prends en paramètre pour la construction UNE trame (pas tout le pcap)
-#--- Attributs : "protocole" = Nom du protocole de la trame ; "size" = taille de la trame ;
-#--- "
 
 
 #--- Type : 2048 -> IPv4 ; 2054 -> ARP ; 34525 -> IPv6
@@ -12,7 +8,7 @@ class Trame():
         print("\nCREATION DE L'OBJET TRAME \n")
         self.mac_src=packet[Ether].src      # Correspond à l'adresse mac source de la trame
         self.mac_dst=packet[Ether].dst      # Correspond à l'adresse mac destination de la trame
-        self.type=packet[Ether].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
+        self.type=packet[Ehter].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
         if(self.type==2048):                # Si c'est une trame IP
             print("TYPE IP \n")
             self.type="IP"                  # On le renomme sous forme d'un string pour pouvoir l'utiliser
@@ -35,19 +31,22 @@ class Trame():
         else:
             print("TYPE INCONNU\n")
         print("OBJET CREE\n")
-        
+
     def find_protocol(self,packet):
         try:
             if(self.proto==6):
                 protocol_tcp(packet)
             elif(self.proto==17):
                 protocol_udp(packet)
+            elif(self.proto==1):
+                protocol_icmp(packet)
             else:
                 print("Protocole inconnu : {} ; à mettre à jour".format(self.proto))
         except Exception as e:
             print("Error : {}".format(e))
 
     def protocol_tcp(self,packet):
+# ---------------- Attributs : protocol | port_src | port_dst | (data) | flags ------
         flags = {
         'F': 'FIN',
         'S': 'SYN',
@@ -62,21 +61,51 @@ class Trame():
         self.port_src=packet["TCP"].sport
         self.port_dst=packet["TCP"].dport
         self.flags=[flags for x in str(packet["TCP"].flags)]
-
-
+        # On repère si les données Raw sont vides :
+        # Si c'est vide, c'est juste un protocole TCP simple et on ne fait rien
+        try:
+            self.data=packet["Raw"].load
+            # Signature d'une trame TLS avec les deux versions différentes
+            if(self.data[1:3]==b'\x03\x03' or self.data[1:3]==b'\x03\x01'):
+                protocol_tls(packet)
+            # Un paquet TCP avec des datas est une requête FTP
+            elif(self.port_src==80 or self.port_dst==80):
+                protocol_http(packet)
+            elif(self.port_src==443 or self.port_dst==443):
+                protocol_https(packet)
+            elif(self.port_src==23 or self.port_dst==23):
+                protocol_telnet(packet)
+            elif(self.port_src==22 or self.port_dst==22):
+                protocol_ssh(packet)
+            elif(packet["TCP"].flags=="A"):
+                protocol_ftp_data(packet)
+            elif(packet["TCP"].flags=="PA"):
+                protocol_ftp(packet)
+            else:
+                print("Unknown trame | à mettre à jour")
+        except:
+            continue
+        if(self.flags=="PA"):
+            protocol_ftp(packet)
+        elif(self.flags=="A"):
+            protocol_ftp_data(packet)
     def protocol_udp(self,packet):
+# ---------------- Attributs : protocol | port_src | port_dst ----------------------
         self.protocol="UDP"
         self.port_src=packet["UDP"].sport
         self.port_dst=packet["UDP"].dport
         if(self.port_src==67 or self.port_src==68):
             protocol_dhcp(packet)
+        elif(self.port_src==53 or self.port_dst==53):
+            protocol_dns(packet)
 
     def protocol_dhcp(self,packet):
+# ---------------- Attributs : protocol | option -----------------------------------
         self.protocol="DHCP"         # On actualise le protocole
         self.option=packet["DHCP options"].options[0][1]
         if(self.option==1):
             self.option="Discover"
-        elif(self.option==2):
+        elif(self.option==2): 
             self.option="Offer"
         elif(self.option==3):
             self.option="Request"
@@ -86,26 +115,77 @@ class Trame():
             print("Option DHCP inconnue : {} | Mettre à jour".format(self.option))
     def protocol_smtp(self,packet):
         print("à faire")
+
     def protocol_ntlm(self,packet):
         print("à faire")
+
     def protocol_ssh(self,packet):
-        print("à faire")
+        self.protocol="SSH"
+
     def protocol_telnet(self,packet):
-        print("à faire")
+        self.protocol="TELNET"
     def protocol_http(self,packet):
-        print("à faire")
+        self.protocol="HTTP"
+
     def protocol_https(self,packet):
-        print("à faire")
+        self.protocol="HTTPS"
+
     def protocol_icmp(self,packet):
-        print("à faire")
+# ---------------- Attributs : protocol | data | icmp_type -------------------------
+        self.protocol="ICMP"
+        self.data=packet["Raw"].load
+        self.icmp_type=packet["ICMP"].type
+        if(self.icmp_type==0):
+            self.icmp_type="Reply"
+        elif(self.icmp_type==8):
+            self.icmp_type="Request"
+        else:
+            print("Unknown ICMP type {} | à mettre à jour".format(self.icmp_type))
+
     def protocol_ntp(self,packet):
         print("à faire")
+
     def protocol_ftp(self,packet):
-        print("à faire")
+# -------------------- Attributs : protocol ----------------------------------------
+        self.protocol="FTP"
+
+    def protocol_ftp_data(self,packet):
+# -------------------- Attributs : protocol ----------------------------------------
+        self.protocol="FTP-Data"
+
     def protocol_tls(self,packet):
-        print("à faire")
+# -------------------- Attributs : protocol | tls_protocol -------------------------
+        self.protocol="TLS"
+        self.tls_protocol=self.data[0]
+        if(self.tls_protocol==b'\x21'):
+            self.tls_protocol="Alert"
+        elif(self.tls_protocol==b'\x22'):
+            self.tls_protocol="Handshake"
+        elif(self.tls_protocol==b'\x23'):
+            self.tls_protocol="Application data"
+        else:
+            print("Unknown TLS protocol number {} | mettre à jour".format(self.tls_protocol))
+
     def protocol_dns(self,packet):
-        print("à faire")
+        self.protocol="DNS"
+        self.qdcount=packet["DNS"].qdcount  # DNS Question Record
+        self.ancount=packet["DNS"].ancount  # DNS Resource Record
+        self.nscount=packet["DNS"].nscount  # DNS SOA Resource Record
+        self.arcount=packet["DNS"].arcount  # A compléter
+        self.qname=[]
+        self.qtype=[]
+        self.qclass=[]
+        self.an_rrname=[]
+        for i in range(self.qdcount):
+            tempo=packet["DNS"].qd[i]
+            self.qname.append(tempo.qname)
+            self.qtype.append(tempo.qtype)
+            self.qclass.append(tempo.qclass)
+
+        for i in range(self.ancount):
+        for i in range(self.nscount):
+        for i in range(self.arcount):
+
     def protocol_ntp(self,packet):
         print("à faire")
     def protocol_snmp(self,packet):
