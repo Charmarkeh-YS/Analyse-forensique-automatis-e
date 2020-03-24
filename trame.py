@@ -1,3 +1,5 @@
+#-*-coding:utf-8-*-
+
 class Trame():
 #--- Classe qui définit une trame réseau tirée d'un pcap par différents paramètres ---
 #--- Prends en paramètre pour la construction UNE trame (pas tout le pcap)
@@ -6,28 +8,30 @@ class Trame():
 #--- Type : 2048 -> IPv4 ; 2054 -> ARP ; 34525 -> IPv6
     def __init__(self,packet):
         print("\nCREATION DE L'OBJET TRAME \n")
-        self.mac_src=packet[Ether].src      # Correspond à l'adresse mac source de la trame
-        self.mac_dst=packet[Ether].dst      # Correspond à l'adresse mac destination de la trame
-        self.type=packet[Ehter].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
+        self.poids=0
+        print(packet)
+        self.mac_src=packet["Ethernet"].src      # Correspond à l'adresse mac source de la trame
+        self.mac_dst=packet["Ethernet"].dst      # Correspond à l'adresse mac destination de la trame
+        self.type=packet["Ethernet"].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
         if(self.type==2048):                # Si c'est une trame IP
             print("TYPE IP \n")
             self.type="IP"                  # On le renomme sous forme d'un string pour pouvoir l'utiliser
-            self.ip_src=packet[IP].src      # Correspond à l'adresse ip source de la trame
-            self.ip_dst=packet[IP].dst      # Correspond à l'adresse ip destintation de la trame
-            self.size=packet[IP].len        # Correspond à la taille du protocole IP
-            self.protocol=packet[IP].proto  # Correspond au protocole correspondant
-            find_protocol(packet)           # Cherche le bon protocole correspondant à la trame et assigne les bons attributs 
+            self.ip_src=packet["IP"].src      # Correspond à l'adresse ip source de la trame
+            self.ip_dst=packet["IP"].dst      # Correspond à l'adresse ip destintation de la trame
+            self.size=packet["IP"].len        # Correspond à la taille du protocole IP
+            self.proto=packet["IP"].proto  # Correspond au protocole correspondant
+            self.find_protocol(packet)           # Cherche le bon protocole correspondant à la trame et assigne les bons attributs 
 
         elif(self.type==2054):              # Si c'est une trame ARP
             print("TYPE ARP \n")
-            if(packet[ARP].op==1):          # Repère le type de requête ARP (Requête/Réponse) assigné à self.req
+            if(packet["ARP"].op==1):          # Repère le type de requête ARP (Requête/Réponse) assigné à self.req
                 self.req="request"         
-            elif(packet[ARP].op==2):
+            elif(packet["ARP"].op==2):
                 self.req="answer"
             else:
                 self.req="unknown"          
-            self.ip_src=packet[ARP].psrc
-            self.ip_dst=packet[ARP].pdst
+            self.ip_src=packet["ARP"].psrc
+            self.ip_dst=packet["ARP"].pdst
         else:
             print("TYPE INCONNU\n")
         print("OBJET CREE\n")
@@ -35,11 +39,11 @@ class Trame():
     def find_protocol(self,packet):
         try:
             if(self.proto==6):
-                protocol_tcp(packet)
+                self.protocol_tcp(packet)
             elif(self.proto==17):
-                protocol_udp(packet)
+                self.protocol_udp(packet)
             elif(self.proto==1):
-                protocol_icmp(packet)
+                self.protocol_icmp(packet)
             else:
                 print("Protocole inconnu : {} ; à mettre à jour".format(self.proto))
         except Exception as e:
@@ -67,24 +71,24 @@ class Trame():
             self.data=packet["Raw"].load
             # Signature d'une trame TLS avec les deux versions différentes
             if(self.data[1:3]==b'\x03\x03' or self.data[1:3]==b'\x03\x01'):
-                protocol_tls(packet)
+                self.protocol_tls(packet)
             # Un paquet TCP avec des datas est une requête FTP
             elif(self.port_src==80 or self.port_dst==80):
-                protocol_http(packet)
+                self.protocol_http(packet)
             elif(self.port_src==443 or self.port_dst==443):
-                protocol_https(packet)
+                self.protocol_https(packet)
             elif(self.port_src==23 or self.port_dst==23):
-                protocol_telnet(packet)
+                self.protocol_telnet(packet)
             elif(self.port_src==22 or self.port_dst==22):
-                protocol_ssh(packet)
+                self.protocol_ssh(packet)
             elif(packet["TCP"].flags=="A"):
-                protocol_ftp_data(packet)
+                self.protocol_ftp_data(packet)
             elif(packet["TCP"].flags=="PA"):
-                protocol_ftp(packet)
+                self.protocol_ftp(packet)
             else:
                 print("Unknown trame | à mettre à jour")
-        except:
-            continue
+        except Exception as e:
+            print(e)
         if(self.flags=="PA"):
             protocol_ftp(packet)
         elif(self.flags=="A"):
@@ -95,9 +99,9 @@ class Trame():
         self.port_src=packet["UDP"].sport
         self.port_dst=packet["UDP"].dport
         if(self.port_src==67 or self.port_src==68):
-            protocol_dhcp(packet)
+            self.protocol_dhcp(packet)
         elif(self.port_src==53 or self.port_dst==53):
-            protocol_dns(packet)
+            self.protocol_dns(packet)
 
     def protocol_dhcp(self,packet):
 # ---------------- Attributs : protocol | option -----------------------------------
@@ -176,6 +180,23 @@ class Trame():
         self.qtype=[]
         self.qclass=[]
         self.an_rrname=[]
+        self.an_type=[]
+        self.an_rclass=[]
+        self.an_ttl=[]
+        self.an_rdlen=[]
+        self.an_rdata=[]
+        self.ns_rrname=[]
+        self.ns_type=[]
+        self.ns_rclass=[]
+        self.ns_ttl=[]
+        self.ns_rdlen=[]
+        self.ns_mname=[]
+        self.ns_rname=[]
+        self.ns_serial=[]
+        self.ns_refresh=[]
+        self.ns_retry=[]
+        self.ns_expire=[]
+        self.ns_minimum=[]
         for i in range(self.qdcount):
             tempo=packet["DNS"].qd[i]
             self.qname.append(tempo.qname)
@@ -183,9 +204,29 @@ class Trame():
             self.qclass.append(tempo.qclass)
 
         for i in range(self.ancount):
+            tempo=packet["DNS"].an[i]
+            self.an_rrname.append(tempo.rname)
+            self.an_type.append(tempo.type)
+            self.an_rclass.append(tempo.rclass)
+            self.an_ttl.append(tempo.ttl)
+            self.an_rdlen.append(tempo.rdlen)
+            self.an_rdata.append(tempo.rdata)
         for i in range(self.nscount):
+            tempo=packet["DNS"].ns[i]
+            self.ns_rrname.append(tempo.rrname)
+            self.ns_type.append(tempo.type)
+            self.ns_rclass.append(tempo.rclass)
+            self.ns_ttl.append(tempo.ttl)
+            self.ns_rdlen.append(tempo.rdlen)
+            self.ns_mname.append(tempo.mname)
+            self.ns_rname.append(tempo.rname)
+            self.ns_serial.append(tempo.serial)
+            self.ns_refresh.append(tempo.refresh)
+            self.ns_retry.append(tempo.retry)
+            self.ns_expire.append(tempo.expire)
+            self.ns_minimum.append(tempo.minimum)
         for i in range(self.arcount):
-
+            print("à faire")
     def protocol_ntp(self,packet):
         print("à faire")
     def protocol_snmp(self,packet):
