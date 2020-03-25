@@ -34,13 +34,16 @@ def detectTcpPortScan(path):
     # Display the scan report at the screen
     if scan_report:
         print('\n'+30*'-'+' PORTS SCAN DETECTED '+30*'-')
+
         for (ip_origin, ip_target) in scan_report:
             scanned_ports = scan_report[(ip_origin, ip_target)][0]
             closed_ports = scan_report[(ip_origin, ip_target)][1]
             opened_ports = scan_report[(ip_origin, ip_target)][2]
+            nb_filtered_ports = len(scanned_ports) - len(closed_ports) - len(opened_ports)
             print('Scan of {} ports (SYN flag sended by TCP) to {} from {}'.format(len(scanned_ports), ip_target, ip_origin))
-            print('{} ports are closed (RST, ACK flags)'.format(len(closed_ports)))
-            print('{} ports are opened (SYN ACK flags): {}\n'.format(len(opened_ports), " ".join([str(i) for i in opened_ports])))
+            print('{} port(s) filtered (No reply from {})'.format(nb_filtered_ports, ip_target))
+            print('{} port(s) closed (RST, ACK flags)'.format(len(closed_ports)))
+            print('{} port(s) opened (SYN ACK flags): {}\n'.format(len(opened_ports), " ".join([str(i) for i in opened_ports])))
 
     else:
         print('\n'+30*'-'+'NO PORTS SCAN DETECTED '+30*'-')
