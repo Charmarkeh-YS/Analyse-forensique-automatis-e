@@ -24,7 +24,7 @@ class Trame():
 
         elif(self.type==2054):              # Si c'est une trame ARP
             print("TYPE ARP \n")
-            if(packet["ARP"].op==1):          # Repère le type de requête ARP (Requête/Réponse) assigné à self.req
+            if(packet["ARP"].op==1):          # Repère le type de  requête ARP (Requête/Réponse) assigné à self.req
                 self.req="request"         
             elif(packet["ARP"].op==2):
                 self.req="answer"
