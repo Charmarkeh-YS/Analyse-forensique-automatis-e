@@ -2,38 +2,47 @@ from scapy.all import *
 
 def detectTcpPortScan(path):
     pcap_file = rdpcap(path)
-    ip_origin = []
-    ip_target = []
-    ports_tested = []
-    ports_opened = []
-    ports_closed = []
+    scan_report = dict()  # scan_report has this shape : {(ip_origin1, ip_traget1): [scanned_ports1,closed_ports1,opened_ports1], (ip_origin2, ip_traget2): [scanned_ports2,closed_ports2,opened_ports2], ..., (ip_originN, ip_tragetN): [scanned_portsN,closed_portsN,opened_portsN]}
 
-    for i,frame in enumerate(pcap_file):
+    # Read all frames of the pcap file
+    for frame in pcap_file:
         layers = frame.layers()
-        if layers[2].__name__ == 'TCP':
+
+        if len(layers) > 2 and layers[2].__name__ == 'TCP':
+            ip_src = frame[IP].src
+            ip_dst = frame[IP].dst
+            port_src = frame[TCP].sport
+            port_dst = frame[TCP].dport
+
             # SYN flag
-            if frame[TCP].flags.value == 0x2 and frame[TCP].dport not in ports_tested:
-                ports_tested.append(frame[TCP].dport)
-                if frame[IP].src not in ip_origin:
-                    ip_origin.append(frame[IP].src)
-                if frame[IP].dst not in ip_target:
-                    ip_target.append(frame[IP].dst)
+            if frame[TCP].flags.value == 0x02:
+                if (ip_src, ip_dst) not in scan_report:
+                    scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                scan_report[(ip_src, ip_dst)][0].add(port_dst)
             # SYN ACK flags
-            if frame[TCP].flags.value == 0x12 and frame[TCP].sport not in ports_opened:
-                ports_opened.append(frame[TCP].sport)
+            elif frame[TCP].flags.value == 0x12 and (ip_dst, ip_src) in scan_report:
+                scan_report[(ip_dst, ip_src)][2].add(port_src)
             # RST ACK flags
-            if frame[TCP].flags.value == 0x14 and frame[TCP].sport not in ports_closed:
-                ports_closed.append(frame[TCP].sport)
+            elif frame[TCP].flags.value == 0x14 and (ip_dst, ip_src) in scan_report:
+                scan_report[(ip_dst, ip_src)][1].add(port_src)
 
-    ports_tested.sort()
-    ports_closed.sort()
-    ports_opened.sort()
+    # Sort all ports sets for each (ip_origin, ip_target), sorted function return a sorted list
+    for k in scan_report:
+        for i in range(3):
+            scan_report[k][i] = sorted(scan_report[k][i]) # sets become lists
+    
+    # Display the scan report at the screen
+    if scan_report:
+        print('\n'+30*'-'+' PORTS SCAN DETECTED '+30*'-')
+        for (ip_origin, ip_target) in scan_report:
+            scanned_ports = scan_report[(ip_origin, ip_target)][0]
+            closed_ports = scan_report[(ip_origin, ip_target)][1]
+            opened_ports = scan_report[(ip_origin, ip_target)][2]
+            print('Scan of {} ports (SYN flag sended by TCP) to {} from {}'.format(len(scanned_ports), ip_target, ip_origin))
+            print('{} ports are closed (RST, ACK flags)'.format(len(closed_ports)))
+            print('{} ports are opened (SYN ACK flags): {}\n'.format(len(opened_ports), " ".join([str(i) for i in opened_ports])))
 
-    print("\n" + 30*"-" + "WARNING, PORT SCAN DETECTED" + 30*"-")
-    print("Target IP : " + " ".join(ip_target))
-    print("Origin IP : " + " ".join(ip_origin))
+    else:
+        print('\n'+30*'-'+'NO PORTS SCAN DETECTED '+30*'-')
 
-    print(str(len(ports_tested)) + " ports were scanned, "+ str(len(ports_closed)) + " are closed.")
-    print("Ports opened : ")
-    for i in ports_opened:
-        print(str(i))
+    return scan_report
