@@ -1,20 +1,20 @@
 #-*-coding:utf-8-*-
 
-class Trame():
+class Trame:
 #--- Classe qui définit une trame réseau tirée d'un pcap par différents paramètres ---
 #--- Prends en paramètre pour la construction UNE trame (pas tout le pcap)
 
 
 #--- Type : 2048 -> IPv4 ; 2054 -> ARP ; 34525 -> IPv6
-    def __init__(self,packet):
-        print("\nCREATION DE L'OBJET TRAME \n")
+    def __init__(self,packet,identifiant):
+        print("\nCREATION DE L'OBJET TRAME")
         self.poids=0
-        print(packet)
+        self.id=identifiant
         self.mac_src=packet["Ethernet"].src      # Correspond à l'adresse mac source de la trame
         self.mac_dst=packet["Ethernet"].dst      # Correspond à l'adresse mac destination de la trame
         self.type=packet["Ethernet"].type        # Correspond au protocole de la couche 3 (Pour nous soit ARP / IP)
         if(self.type==2048):                # Si c'est une trame IP
-            print("TYPE IP \n")
+            print("TYPE IP")
             self.type="IP"                  # On le renomme sous forme d'un string pour pouvoir l'utiliser
             self.ip_src=packet["IP"].src      # Correspond à l'adresse ip source de la trame
             self.ip_dst=packet["IP"].dst      # Correspond à l'adresse ip destintation de la trame
@@ -24,6 +24,8 @@ class Trame():
 
         elif(self.type==2054):              # Si c'est une trame ARP
             print("TYPE ARP \n")
+            self.type="ARP"
+            self.protocol="ARP"
             if(packet["ARP"].op==1):          # Repère le type de  requête ARP (Requête/Réponse) assigné à self.req
                 self.req="request"         
             elif(packet["ARP"].op==2):
@@ -34,7 +36,7 @@ class Trame():
             self.ip_dst=packet["ARP"].pdst
         else:
             print("TYPE INCONNU\n")
-        print("OBJET CREE\n")
+        print("OBJET {} CREE\n".format(self.id))
 
     def find_protocol(self,packet):
         try:
