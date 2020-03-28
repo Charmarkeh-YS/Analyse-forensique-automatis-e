@@ -2,25 +2,6 @@
 from trame import Trame
 from scapy.all import *
 <<<<<<< HEAD
-<<<<<<< HEAD
-=======
-
-
-
-class NetworkAnalyzer():
-
-#******************************************** ATTRIBUTS **********************************************
-
-    self.trameList=[]
-    self.userList=[]
-    self.nbTrames=0
-
-#************************************ CONSTRUCTEUR / DESTRUCTEUR *************************************
-    def __init__(self,fileName):
-        self.fileName=fileName
-        if(self.fileName.split(".")[1]!="pcap"):
-=======
->>>>>>> master
 from user import User
 
 
@@ -47,7 +28,6 @@ class NetworkAnalyzer():
         self.fileName=fileName
         if(self.fileName[-4:]!="pcap"):
             print(self.fileName[-4:])
-<<<<<<< HEAD
 
 
 
@@ -64,24 +44,10 @@ class NetworkAnalyzer():
         self.fileName=fileName
         if(self.fileName.split(".")[1]!="pcap"):
 
-=======
->>>>>>> master
->>>>>>> master
             print("Mauvaise extension")
             del self       # STOP LE PROGRAMME
         else:
             print("Reading {}".format(fileName))
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-            self.initializeTrameList()
-            # Initialise la variable userList
-            self.defineUserList()
-
-    def __del__(self):
-        print("Erreur : Destruction de l'objet")
-=======
->>>>>>> master
             print("Inialisation de l'objet...")
             self.initializeTrameList()
             # Initialise la variable userList
@@ -90,32 +56,20 @@ class NetworkAnalyzer():
         print("Objet analyser construit")
     def __del__(self):
         print("Destruction de l'objet")
-<<<<<<< HEAD
             self.initializeTrameList()
             # Initialise la variable userList
             self.defineUserList()
 
     def __del__(self):
         print("Erreur : Destruction de l'objet")
-=======
->>>>>>> master
->>>>>>> master
 
 #*********************************** FONCTIONS D'INITIALISATIONS *************************************
     def initializeTrameList(self):
         try:
             packets=rdpcap(self.fileName)
             for packet in packets:
-<<<<<<< HEAD
                 trame=Trame(packet,self.nbTrames+1)
                 trame=Trame(packet)
-=======
-<<<<<<< HEAD
-                trame=Trame(packet)
-=======
-                trame=Trame(packet,self.nbTrames+1)
->>>>>>> master
->>>>>>> master
                 self.trameList.append(trame)
                 self.nbTrames+=1
         except Exception as e:
@@ -125,18 +79,6 @@ class NetworkAnalyzer():
     def initializeUserList(self):
         # Création d'une liste temporaire pour remplir les utilisateurs en fonction des adresses MAC 
         # présentes sur le pcap
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-        
-        for trame in self.trameList:
-            if(
-#****************************************************************************************************
-
-    def __del__(self):
-        print("Erreur : fichier donné en paramètre incorrecte")
-=======
->>>>>>> master
 
         listCreationUser=[]
         for trame in self.trameList:
@@ -167,7 +109,3 @@ class NetworkAnalyzer():
             self.userList.append(user)
 #****************************************************************************************************
 
-<<<<<<< HEAD
-=======
->>>>>>> master
->>>>>>> master
