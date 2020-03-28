@@ -1,5 +1,6 @@
 #-*-coding:utf-8-*-
 
+
 class User:
 #--- Classe qui définit un utilisateur à partir d'une liste d'objets Trames
 #--- En paramètre pour le constructeur, donner une liste de trames ayant la même adresse mac en source
