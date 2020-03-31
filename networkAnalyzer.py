@@ -58,6 +58,7 @@ class NetworkAnalyzer():
 
         listCreationUser=[]
         for trame in self.trameList:
+            new_user=False
             # Si la liste est vide, on la remplit avec un tuple ("Mac",[liste des trames associées])
             if(len(listCreationUser)==0):
                 listCreationUser.append((trame.mac_src,[trame]))
@@ -73,11 +74,15 @@ class NetworkAnalyzer():
 
                 if(etat==0):
                     listCreationUser.append((trame.mac_src,[trame]))
+                    new_user=True                                   # Variable permettant d'éviter les dédoublements à la création
+                    break
             # Sinon, on ajoute la trame à l'adresse mac correspondante
-                if(mac_address==trame.mac_src):
+                elif(mac_address==trame.mac_src):
                     listCreationUser[i][1].append(trame)
+                
                 i+=1
-                    
+            if(new_user==True):
+                continue
         # Création des objets User via la liste de tuple ("Mac",[Trame_liste_associee])
         for mac_address,liste_trames_associees in listCreationUser:
             user=User(liste_trames_associees,mac_address)
