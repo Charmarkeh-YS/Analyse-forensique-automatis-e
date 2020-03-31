@@ -66,14 +66,13 @@ class NetworkAnalyzer():
             for mac_address,liste_trames_associees in listCreationUser:
             # On parcourt la liste en question
             # Si l'adresse mac n'existe pas, on ajoute un tuple
-                for mac_address, liste_trames_associees in listCreationUser:
-                    etat=0
-                    for a,b in listCreationUser:
-                        if(a==trame.mac_src):
-                            etat=1
+                etat=0
+                for a,b in listCreationUser:
+                    if(a==trame.mac_src):
+                        etat=1
 
-                    if(etat==0):
-                        listCreationUser.append((trame.mac_src,[trame]))
+                if(etat==0):
+                    listCreationUser.append((trame.mac_src,[trame]))
             # Sinon, on ajoute la trame à l'adresse mac correspondante
                 if(mac_address==trame.mac_src):
                     listCreationUser[i][1].append(trame)

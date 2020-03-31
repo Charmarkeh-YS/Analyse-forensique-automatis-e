@@ -31,14 +31,15 @@ class User:
         protocoles=[("TCP",self.tcpCount),("UDP",self.udpCount),("IP",self.ipCount),("ARP",self.arpCount),
                 ("DHCP",self.dhcpCount),("NTLM",self.ntlmCount),("SMTP",self.smtpCount),
                 ("SSH",self.sshCount),("TELNET",self.telnetCount),("HTTP",self.httpCount),
-                ("HTTPS",self.httpsCount),("ICMP",self.icmpCount),("NTP",self.ntpCount),("FTP",self.ftpCount),
-                ("TLS",self.tlsCount),("DNS",self.dnsCount),("SNMP",self.snmpCount)]
+                ("HTTPS",self.httpsCount),("ICMP",self.icmpCount),("NTP",self.ntpCount),
+                ("FTP",self.ftpCount),("TLS",self.tlsCount),("DNS",self.dnsCount),("SNMP",self.snmpCount)]
         for trame in listTrames:
             # Ajoute la trame courante dans la liste des trames appartenant à l'utilisateur
             self.userTramesList.append(trame)
             for proto in protocoles:
                 # Parcourt la liste protocoles et ajoute 1 au compteur en fonction du bon protocole
                 if(trame.protocol==proto[0]):
+                    print("On ajoute un protocole {} dans user {}".format(trame.protocol,self))
                     new_tuple=(proto[0],proto[1]+1)
                     proto=new_tuple
             # Idée temporaire pour détecter suspiscion de changement suspect d'adresse ip
