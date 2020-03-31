@@ -1,7 +1,6 @@
 #-*-coding:utf-8-*-
 from trame import Trame
 from scapy.all import *
-<<<<<<< HEAD
 from user import User
 
 
@@ -28,22 +27,6 @@ class NetworkAnalyzer():
         self.fileName=fileName
         if(self.fileName[-4:]!="pcap"):
             print(self.fileName[-4:])
-
-
-
-class NetworkAnalyzer():
-
-#******************************************** ATTRIBUTS **********************************************
-
-    self.trameList=[]
-    self.userList=[]
-    self.nbTrames=0
-
-#************************************ CONSTRUCTEUR / DESTRUCTEUR *************************************
-    def __init__(self,fileName):
-        self.fileName=fileName
-        if(self.fileName.split(".")[1]!="pcap"):
-
             print("Mauvaise extension")
             del self       # STOP LE PROGRAMME
         else:
@@ -56,12 +39,6 @@ class NetworkAnalyzer():
         print("Objet analyser construit")
     def __del__(self):
         print("Destruction de l'objet")
-            self.initializeTrameList()
-            # Initialise la variable userList
-            self.defineUserList()
-
-    def __del__(self):
-        print("Erreur : Destruction de l'objet")
 
 #*********************************** FONCTIONS D'INITIALISATIONS *************************************
     def initializeTrameList(self):
@@ -69,7 +46,6 @@ class NetworkAnalyzer():
             packets=rdpcap(self.fileName)
             for packet in packets:
                 trame=Trame(packet,self.nbTrames+1)
-                trame=Trame(packet)
                 self.trameList.append(trame)
                 self.nbTrames+=1
         except Exception as e:
