@@ -2,7 +2,7 @@
 from trame import Trame
 from scapy.all import *
 from user import User
-
+import time
 
 class NetworkAnalyzer():
     #---------------- Différents attributs ------------------
@@ -35,8 +35,8 @@ class NetworkAnalyzer():
             print("Inialisation de l'objet...")
             self.initializeFrameList()
             # Initialise la variable userList
-            #print("Initialisation de la liste des user...")
-            #self.initializeUserList()
+            print("Initialisation de la liste des user...")
+            self.initializeUserList()
         print("Analyser built")
     def __del__(self):
         print("Deleting analyser...")
@@ -101,6 +101,56 @@ class NetworkAnalyzer():
             self.userList.append(user)
 
 #************************************ ATTACKS DETECTION METHODS **************************************
+    def detectTcpPortScanWithTrame(self):
+        start_time = time.time()
+        scan_report= dict()
+        for i, frame in enumerate(self.frameList):
+        
+            ip_src = frame.ip_src
+            ip_dst = frame.ip_dst
+            port_src = frame.port_src
+            port_dst = frame.port_dst
+
+            # SYN flag
+            if frame.flags==["SYN"]:
+                if (ip_src, ip_dst) not in scan_report:
+                    scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                scan_report[(ip_src, ip_dst)][0].add(port_dst)
+            # SYN ACK flags
+            elif frame.flags==["SYN","ACK"] and (ip_dst, ip_src) in scan_report:
+                scan_report[(ip_dst, ip_src)][2].add(port_src)
+            # RST ACK flags
+            elif frame.flags==["RST","ACK"] and (ip_dst, ip_src) in scan_report:
+                scan_report[(ip_dst, ip_src)][1].add(port_src)
+
+        # Sort all ports sets for each (ip_attacker, ip_target), sorted function return a sorted list
+        for k in scan_report:
+            for i in range(3):
+                scan_report[k][i] = sorted(scan_report[k][i]) # Sets become list
+
+        if(scan_report):
+            print('\n'+30*'-'+' TCP PORTS SCAN DETECTED '+30*'-')
+            for (ip_attacker, ip_target) in scan_report:
+                scanned_ports = scan_report[(ip_attacker, ip_target)][0]
+                closed_ports = scan_report[(ip_attacker, ip_target)][1]
+                opened_ports = scan_report[(ip_attacker, ip_target)][2]
+                filtered_ports = sorted(set(scanned_ports).difference(set(closed_ports).union(set(opened_ports))))
+
+                print('\nScan of {} ports (SYN flag) to {} from {}'.format(len(scanned_ports), ip_target, ip_attacker))
+                print('{} port(s) filtered (No reply from {})'.format(len(filtered_ports), ip_target))
+                print('{} port(s) closed (RST, ACK flags)'.format(len(closed_ports)))
+                if 0 < len(closed_ports) <= 20:
+                    print(' '.join([str(i) for i in closed_ports]))
+                print('{} port(s) opened (SYN ACK flags)'.format(len(opened_ports)))
+                if 0 < len(opened_ports) <= 20:
+                    print(' '.join([str(i) for i in opened_ports]))
+
+        else:
+            print('\n'+30*'-'+'NO TCP PORTS SCAN DETECTED '+30*'-')
+
+        print("Temps d'éxecution directement avec trame : {} secondes".format(time.time()-start_time))
+
+
 
     def detectTcpPortScan(self):
         """
@@ -152,7 +202,7 @@ class NetworkAnalyzer():
 
         opened_ports is an int list of port where TCP flag is SYN-ACK
         """
-
+        start_time= time.time()
         scan_report = dict()
         frameList = rdpcap(self.path)
 
@@ -204,7 +254,8 @@ class NetworkAnalyzer():
 
         else:
             print('\n'+30*'-'+'NO TCP PORTS SCAN DETECTED '+30*'-')
-
+        
+        print("Temps d'éxecution directement avec scapy : {} secondes".format(time.time()-start_time))
         return scan_report
 
 
@@ -284,7 +335,6 @@ class NetworkAnalyzer():
             print('\n'+30*'-'+'NO INVERSE TCP PORTS SCAN DETECTED '+30*'-')
 
         return scan_report
-
 
     def detectUdpPortScan(self):
         """

@@ -66,7 +66,7 @@ class Trame:
         self.protocol="TCP"
         self.port_src=packet["TCP"].sport
         self.port_dst=packet["TCP"].dport
-        self.flags=[flags for x in str(packet["TCP"].flags)]
+        self.flags=[flags[x] for x in str(packet["TCP"].flags)]
         # On repère si les données Raw sont vides :
         # Si c'est vide, c'est juste un protocole TCP simple et on ne fait rien
         try:

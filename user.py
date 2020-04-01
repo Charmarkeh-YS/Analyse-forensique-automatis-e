@@ -39,7 +39,6 @@ class User:
             for proto in protocoles:
                 # Parcourt la liste protocoles et ajoute 1 au compteur en fonction du bon protocole
                 if(trame.protocol==proto[0]):
-                    print("On ajoute un protocole {} dans user {}".format(trame.protocol,self))
                     new_tuple=(proto[0],proto[1]+1)
                     proto=new_tuple
             # Idée temporaire pour détecter suspiscion de changement suspect d'adresse ip

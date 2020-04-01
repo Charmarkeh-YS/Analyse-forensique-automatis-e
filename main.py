@@ -7,11 +7,12 @@ def main():
     #lib_forensique.detectTcpPortScan2(path='Pcaps/nmap_sX.pcap') # Test the detection of Inverse TCP port scan
     #lib_forensique.detectNetworkArpScan(path='Pcaps/netdiscover.pcap') # Test the detection of network ARP scan
 
-    handler = NetworkAnalyzer("./Pcaps/netdiscover.pcap")
+    handler = NetworkAnalyzer("./Pcaps/nmap.pcap")
     handler.detectTcpPortScan()
     handler.detectInverseTcpPortScan()
-    handler.detectUdpPortScan()
-    handler.detectNetworkArpScan()
+    #handler.detectUdpPortScan()
+    #handler.detectNetworkArpScan()
+    handler.detectTcpPortScanWithTrame()
     #print(handler.nbFrame)
     #print(handler.frameList)
     #print(handler.userList)
