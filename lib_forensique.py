@@ -162,3 +162,44 @@ def detectUdpPortScan(path):
         print('\n'+30*'-'+'NO UDP PORTS SCAN DETECTED '+30*'-')
 
     return scan_report
+
+
+def detectNetworkArpScan(path):
+    pcap_file = rdpcap(path)
+    scan_report = dict()  # scan_report has this shape : 
+
+    # Read all frames of the pcap file
+    for frame in pcap_file:
+        layers = frame.layers()
+
+        if len(layers) > 1 and layers[1].__name__ == 'ARP':
+            ip_src = frame[ARP].psrc
+            ip_dst = frame[ARP].pdst
+            op_code = frame[ARP].op
+
+            # ARP request
+            if op_code == 1:
+                if ip_src not in scan_report:
+                    scan_report.setdefault(ip_src, [set(),set()])
+                scan_report[ip_src][0].add(ip_dst)
+
+            # ARP reply
+            elif op_code == 2 and ip_dst in scan_report:
+                scan_report[ip_dst][1].add(ip_src)
+
+    # Display the scan report at the screen
+    if scan_report:
+        print('\n'+30*'-'+' ARP NETWORK SCAN DETECTED '+30*'-')
+
+        for ip_origin in scan_report:
+            request_sent = scan_report[ip_origin][0]
+            reply_received = scan_report[ip_origin][1]
+
+            print('\nScan of {} (ARP request sent) IP adresses from {}'.format(len(request_sent), ip_origin))
+            print('{} distants hosts spotted (ARP reply received)'.format(len(reply_received)))
+            print(' '.join([str(i) for i in reply_received]))
+
+    else:
+        print('\n'+30*'-'+'NO ARP NETWORK SCAN DETECTED '+30*'-')
+
+    return scan_report

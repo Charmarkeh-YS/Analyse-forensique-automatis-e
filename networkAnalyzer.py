@@ -7,9 +7,9 @@ from user import User
 class NetworkAnalyzer():
     #---------------- Différents attributs ------------------
     #--- Tous les attributs sont récupérables à la construction de l'objet
-    #--- trameList : une liste contenant toutes les trames du pcap (Via la classe Trame) 
+    #--- frameList : une liste contenant toutes les trames du pcap (Via la classe Trame) 
     #--- userList : une liste contenant tous les utilisateurs du pcap (On considère un utilisateur = une adresse mac)
-    #--- nbTrames : le nombre de trames totales
+    #--- nbFrame : le nombre de trames totales
 
     #------------- Attributs de la classe User -------------------
     #--- userTramesList : une liste contenant toutes les trames liées à l'adresse mac
@@ -18,36 +18,48 @@ class NetworkAnalyzer():
     #--- Un compteur pour chaque type de protocole pour cet utilisateur
 
 #************************************ CONSTRUCTEUR / DESTRUCTEUR *************************************
-    def __init__(self,fileName):
-        self.trameList=[]
+    def __init__(self, path):
+        self.frameList=[]
         self.userList=[]
-        self.nbTrames=0
+        self.nbFrame=0
 
 
-        self.fileName=fileName
-        if(self.fileName[-4:]!="pcap"):
-            print(self.fileName[-4:])
-            print("Mauvaise extension")
+        self.path=path
+        if(self.path[-4:]!="pcap"):
+            print(self.path[-4:])
+            print("Bad extension")
             del self       # STOP LE PROGRAMME
+
         else:
-            print("Reading {}".format(fileName))
+            print("Reading {}".format(path))
             print("Inialisation de l'objet...")
-            self.initializeTrameList()
+            self.initializeFrameList()
             # Initialise la variable userList
-            print("Initialisation de la liste des user...")
-            self.initializeUserList()
-        print("Objet analyser construit")
+            #print("Initialisation de la liste des user...")
+            #self.initializeUserList()
+        print("Analyser built")
     def __del__(self):
-        print("Destruction de l'objet")
+        print("Deleting analyser...")
 
 #*********************************** FONCTIONS D'INITIALISATIONS *************************************
-    def initializeTrameList(self):
+    def initFrameList(self):
         try:
-            packets=rdpcap(self.fileName)
+            pcap_file = rdpcap(self.path)
+            for frame in pcap_file:
+                self.frameList.append(frame)
+                self.nbFrame+=1
+
+        except Exception as e:
+            print("Error : {}".format(e))
+            del self    
+    
+    def initializeFrameList(self):
+        try:
+            packets=rdpcap(self.path)
             for packet in packets:
-                trame=Trame(packet,self.nbTrames+1)
-                self.trameList.append(trame)
-                self.nbTrames+=1
+                trame=Trame(packet,self.nbFrame+1)
+                self.frameList.append(trame)
+                self.nbFrame+=1
         except Exception as e:
             print("Error : {}".format(e))
             del self
@@ -57,7 +69,7 @@ class NetworkAnalyzer():
         # présentes sur le pcap
 
         listCreationUser=[]
-        for trame in self.trameList:
+        for trame in self.frameList:
             new_user=False
             # Si la liste est vide, on la remplit avec un tuple ("Mac",[liste des trames associées])
             if(len(listCreationUser)==0):
@@ -87,5 +99,310 @@ class NetworkAnalyzer():
         for mac_address,liste_trames_associees in listCreationUser:
             user=User(liste_trames_associees,mac_address)
             self.userList.append(user)
-#****************************************************************************************************
 
+#************************************ ATTACKS DETECTION METHODS **************************************
+
+    def detectTcpPortScan(self):
+        """
+        Detect a TCP ports scan captured in a pcap file (Vanilla connect and Half-open SYN flag)
+
+        ---------- VANILLA CONNECT ----------
+
+        Port considered opened:
+
+        attacker -----  SYN  ----> target
+        attacker <----SYN-ACK----- target
+        attacker -----  ACK  ----> target
+
+        Port considered closed:
+        attacker -----  SYN  ----> target
+        attacker <----RST-ACK----- target
+
+        Port considered filtered:
+
+        attacker -----  SYN  ----> target
+
+        ---------- HALF-OPEN SYN FLAG ----------
+
+        Port considered opened:
+
+        attacker -----  SYN  ----> target
+        attacker <----SYN-ACK----- target
+        attacker -----  RST  ----> target
+
+        Port considered closed:
+        attacker -----  SYN  ----> target
+        attacker <----RST-ACK----- target
+
+        Port considered filtered:
+        
+        attacker -----  SYN  ----> target
+
+        Return a report :
+
+        {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,opened_ports1],
+        (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,opened_ports2],
+        ..., 
+        (ip_attackerN, ip_targetN): [scanned_portsN,closed_portsN,opened_portsN]}
+
+        scanned_ports is an int list of target ports, port are append into the list
+        if the TCP flag is SYN. All SYN flag are considered suspicious.
+
+        closed_ports is an int list of port where TCP flag is RST-ACK
+
+        opened_ports is an int list of port where TCP flag is SYN-ACK
+        """
+
+        scan_report = dict()
+        frameList = rdpcap(self.path)
+
+        # Read all frames of the pcap file
+        for i,frame in enumerate(frameList):
+            layers = frame.layers()
+
+            if len(layers) > 2 and layers[2].__name__ == 'TCP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+                port_src = frame[TCP].sport
+                port_dst = frame[TCP].dport
+
+                # SYN flag
+                if frame[TCP].flags.value == 0x02:
+                    if (ip_src, ip_dst) not in scan_report:
+                        scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                    scan_report[(ip_src, ip_dst)][0].add(port_dst)
+                # SYN ACK flags
+                elif frame[TCP].flags.value == 0x12 and (ip_dst, ip_src) in scan_report:
+                    scan_report[(ip_dst, ip_src)][2].add(port_src)
+                # RST ACK flags
+                elif frame[TCP].flags.value == 0x14 and (ip_dst, ip_src) in scan_report:
+                    scan_report[(ip_dst, ip_src)][1].add(port_src)
+
+        # Sort all ports sets for each (ip_attacker, ip_target), sorted function return a sorted list
+        for k in scan_report:
+            for i in range(3):
+                scan_report[k][i] = sorted(scan_report[k][i]) # Sets become list
+        
+        # Display the scan report at the screen
+        if scan_report:
+            print('\n'+30*'-'+' TCP PORTS SCAN DETECTED '+30*'-')
+
+            for (ip_attacker, ip_target) in scan_report:
+                scanned_ports = scan_report[(ip_attacker, ip_target)][0]
+                closed_ports = scan_report[(ip_attacker, ip_target)][1]
+                opened_ports = scan_report[(ip_attacker, ip_target)][2]
+                filtered_ports = sorted(set(scanned_ports).difference(set(closed_ports).union(set(opened_ports))))
+
+                print('\nScan of {} ports (SYN flag) to {} from {}'.format(len(scanned_ports), ip_target, ip_attacker))
+                print('{} port(s) filtered (No reply from {})'.format(len(filtered_ports), ip_target))
+                print('{} port(s) closed (RST, ACK flags)'.format(len(closed_ports)))
+                if 0 < len(closed_ports) <= 20:
+                    print(' '.join([str(i) for i in closed_ports]))
+                print('{} port(s) opened (SYN ACK flags)'.format(len(opened_ports)))
+                if 0 < len(opened_ports) <= 20:
+                    print(' '.join([str(i) for i in opened_ports]))
+
+        else:
+            print('\n'+30*'-'+'NO TCP PORTS SCAN DETECTED '+30*'-')
+
+        return scan_report
+
+
+    def detectInverseTcpPortScan(self):
+        """
+        Detect a TCP ports scan captured in a pcap file (Inverse TCP port scan)
+
+        Port considered closed:
+        attacker -----  FIN-URG-PSH-NULL  ----> target
+        attacker <--------- RST-ACK ----------- target
+
+        Port considered open or filtered:
+        
+        attacker -----  SYN  ----> target
+        attacker <--- No reply --- target
+
+        Return a report :
+
+        {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,op_fil_ports1],
+        (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,op_fil_ports2],
+        ..., 
+        (ip_attackerN, ip_targetN): [scanned_portsN,closed_portsN,op_fil_portsN]}
+
+        scanned_ports is an int list of target ports, port are append into the list
+        if the TCP flag is NULL or FIN or FIN-PSH-URG.
+
+        closed_ports is an int list of port where TCP flag is RST-ACK
+
+        op_fil_ports is an int list of open and/or filtered port where attacker received no answer
+        """
+        scan_report = dict()
+        frameList = rdpcap(self.path)
+
+        # Read all frames of the pcap file
+        for i,frame in enumerate(frameList):
+            layers = frame.layers()
+
+            if len(layers) > 2 and layers[2].__name__ == 'TCP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+                port_src = frame[TCP].sport
+                port_dst = frame[TCP].dport
+
+                # FIN-PSH-URG-NULL flags
+                if frame[TCP].flags.value in [0x00, 0x01, 0x29]: # [NULL, FIN, FIN-PSH-URG]
+                    if (ip_src, ip_dst) not in scan_report:
+                        scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                    scan_report[(ip_src, ip_dst)][0].add(port_dst)
+                # RST ACK flags
+                elif frame[TCP].flags.value == 0x14 and (ip_dst, ip_src) in scan_report:
+                    scan_report[(ip_dst, ip_src)][1].add(port_src)
+
+        # Sort all ports sets for each (ip_attacker, ip_target), sorted function return a sorted list
+        for k in scan_report:
+            for i in range(3):
+                scan_report[k][i] = sorted(scan_report[k][i]) # Sets become list
+        
+        # Display the scan report at the screen
+        if scan_report:
+            print('\n'+30*'-'+' INVERSE TCP PORTS SCAN DETECTED '+30*'-')
+
+            for (ip_attacker, ip_target) in scan_report:
+                scanned_ports = scan_report[(ip_attacker, ip_target)][0]
+                closed_ports = scan_report[(ip_attacker, ip_target)][1]
+                op_fil_ports = sorted(set(scanned_ports).difference(set(closed_ports)))
+                scan_report[(ip_attacker, ip_target)][2] = op_fil_ports
+
+                print('\nScan of {} ports (FIN-PUSH-URG-NULL flag sended by TCP) to {} from {}'.format(len(scanned_ports), ip_target, ip_attacker))
+                print('{} port(s) closed (RST, ACK flags)'.format(len(closed_ports)))
+                if 0 < len(closed_ports) <= 20:
+                    print(' '.join([str(i) for i in closed_ports]))
+                print('{} port(s) opened | filtered (No answer)'.format(len(op_fil_ports)))
+                if 0 < len(op_fil_ports) <= 20:
+                    print(' '.join([str(i) for i in op_fil_ports]))
+
+        else:
+            print('\n'+30*'-'+'NO INVERSE TCP PORTS SCAN DETECTED '+30*'-')
+
+        return scan_report
+
+
+    def detectUdpPortScan(self):
+        """
+        Detect a UDP ports scan captured in a pcap file
+
+        Port considered closed:
+        attacker -------------------- UDP frame ------------------> target
+        attacker <------ ICMP Destination Port Unreachable -------- target
+
+        Port considered open or filtered:
+        
+        attacker -----  UDP frame  ----> target
+        attacker <----- No reply ------- target
+
+        Return a report :
+
+        {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,op_fil_ports1],
+        (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,op_fil_ports2],
+        ..., 
+        (ip_attackerN, ip_targetN): [scanned_portsN,closed_portsN,op_fil_portsN]}
+
+        scanned_ports is an int list of target ports.
+
+        closed_ports is an int list of port where attacker received ICMP reply with UDPError
+
+        op_fil_ports is an int list of open and/or filtered port where attacker received no answer
+        """
+        frameList = rdpcap(self.path)
+        scan_report = dict()
+
+        # Read all frames of the pcap file
+        for i,frame in enumerate(frameList):
+            layers = frame.layers()
+
+            # Frame sent by the attacker
+            if len(layers) > 2 and layers[2].__name__ == 'UDP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+                port_dst = frame[UDP].dport
+
+                if (ip_src, ip_dst) not in scan_report:
+                    scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                scan_report[(ip_src, ip_dst)][0].add(port_dst)
+
+            # Frame sent by the target in the case of closed port
+            elif len(layers) > 2 and layers[2].__name__ == 'ICMP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+
+                if (scapy.layers.inet.UDPerror in layers):
+                    port_dst = frame[UDPerror].dport
+                    scan_report[(ip_dst, ip_src)][1].add(port_dst)
+
+        # Sort all ports sets for each (ip_attacker, ip_target), sorted function return a sorted list
+        for k in scan_report:
+            for i in range(3):
+                scan_report[k][i] = sorted(scan_report[k][i]) # Sets become list
+        
+        # Display the scan report at the screen
+        if scan_report:
+            print('\n'+30*'-'+' UDP PORTS SCAN DETECTED '+30*'-')
+
+            for (ip_attacker, ip_target) in scan_report:
+                scanned_ports = scan_report[(ip_attacker, ip_target)][0]
+                closed_ports = scan_report[(ip_attacker, ip_target)][1]
+                op_fil_ports = sorted(set(scanned_ports).difference(set(closed_ports)))
+                scan_report[(ip_attacker, ip_target)][2] = op_fil_ports
+
+                print('\nScan of {} ports to {} from {}'.format(len(scanned_ports), ip_target, ip_attacker))
+                print('{} port(s) closed (ICMP answer)'.format(len(closed_ports)))
+                if 0 < len(closed_ports) <= 20:
+                    print(' '.join([str(i) for i in closed_ports]))
+                print('{} port(s) opened | filtered (No answer)'.format(len(op_fil_ports)))
+                if 0 < len(op_fil_ports) <= 20:
+                    print(' '.join([str(i) for i in op_fil_ports]))
+
+        else:
+            print('\n'+30*'-'+'NO UDP PORTS SCAN DETECTED '+30*'-')
+
+        return scan_report
+
+
+    def detectNetworkArpScan(self):
+        frameList = rdpcap(self.path)
+        scan_report = dict()  # scan_report has this shape : 
+
+        # Read all frames of the pcap file
+        for frame in frameList:
+            layers = frame.layers()
+
+            if len(layers) > 1 and layers[1].__name__ == 'ARP':
+                ip_src = frame[ARP].psrc
+                ip_dst = frame[ARP].pdst
+                op_code = frame[ARP].op
+
+                # ARP request
+                if op_code == 1:
+                    if ip_src not in scan_report:
+                        scan_report.setdefault(ip_src, [set(),set()])
+                    scan_report[ip_src][0].add(ip_dst)
+
+                # ARP reply
+                elif op_code == 2 and ip_dst in scan_report:
+                    scan_report[ip_dst][1].add(ip_src)
+
+        # Display the scan report at the screen
+        if scan_report:
+            print('\n'+30*'-'+' ARP NETWORK SCAN DETECTED '+30*'-')
+
+            for ip_origin in scan_report:
+                request_sent = scan_report[ip_origin][0]
+                reply_received = scan_report[ip_origin][1]
+
+                print('\nScan of {} (ARP request sent) IP adresses from {}'.format(len(request_sent), ip_origin))
+                print('{} distants hosts spotted (ARP reply received)'.format(len(reply_received)))
+                print(' '.join([str(i) for i in reply_received]))
+
+        else:
+            print('\n'+30*'-'+'NO ARP NETWORK SCAN DETECTED '+30*'-')
+
+        return scan_report

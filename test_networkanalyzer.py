@@ -3,11 +3,8 @@ from networkAnalyzer import NetworkAnalyzer
 def main():
     handler= NetworkAnalyzer("./Pcaps/arppoison.pcap")
     
-    i=1
-    for user in handler.userList:
-        
-        print("User {} : {}".format(i,user.macAddr))
+    for i,user in enumerate(handler.userList):
+        print("User {} : {}".format(i+1,user.macAddr))
         print("Nombre de trames émises : {}".format(len(user.userTramesList)))
-        i+=1
-    print("Nombre de trames totales du pcap : {}".format(handler.nbTrames))
+    print("Nombre de trames totales du pcap : {}".format(handler.nbFrame))
 main()
