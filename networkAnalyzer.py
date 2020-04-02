@@ -110,7 +110,7 @@ class NetworkAnalyzer():
             ip_dst = frame.ip_dst
             port_src = frame.port_src
             port_dst = frame.port_dst
-
+            if frame.protocol=="TCP":
             # SYN flag
             if frame.flags==["SYN"]:
                 if (ip_src, ip_dst) not in scan_report:
