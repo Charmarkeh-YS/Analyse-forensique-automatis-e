@@ -41,7 +41,6 @@ class Trame:
         self.mac_dst=packet["Ethernet"].dst
         self.type=packet["Ethernet"].type
     def setRawAttributs(self,packet):
-        print("TO FINISH RAW")
         self.data=packet["Raw"].load
         if(self.data[1:3]==b'\x03\x03' or self.data[1:3]==b'\x03\x01'):
             self.setTlsAttributs(packet)
@@ -57,8 +56,11 @@ class Trame:
             self.setFtpAttributs(packet)
     def setDnsAttributs(self,packet):
         print("TODO DNS")
+        packet.show()
     def setFtpAttributs(self,packet):
-        print("TODO FTP")
+        self.protocol="FTP"
+        self.ftp_request=str(packet["Raw"].load)
+        #print("{} : {}/{} ftp request {}".format(self.protocol,self.ip_src,self.ip_dst,self.ftp_request))
     def setFtpDataAttributs(self,packet):
         print("TODO FTP-Data")
     def setSshAttributs(self,packet):
@@ -66,7 +68,7 @@ class Trame:
     def setTelnetAttributs(self,packet):
         self.protocol="TELNET"
     def setPaddingAttributs(self,packet):
-        print("TODO PADDING")
+        self.padding=str(packet["Padding"].load)
     def setDhcpAttributs(self,packet):
         self.protocol="DHCP"
         dhcp_options={
@@ -99,7 +101,6 @@ class Trame:
         self.ip_src=packet["IP"].src
         self.ip_dst=packet["IP"].dst
         self.ip_len=packet["IP"].len
-
 
     def setUdpAttributs(self,packet):
         self.protocol="UDP"

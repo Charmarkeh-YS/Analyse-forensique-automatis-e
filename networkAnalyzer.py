@@ -37,7 +37,7 @@ class NetworkAnalyzer():
             # Initialise la variable userList
             print("Initialisation de la liste des user...")
             self.initializeUserList()
-        print("Analyser built")
+            print("Analyser built")
     def __del__(self):
         print("Deleting analyser...")
 
