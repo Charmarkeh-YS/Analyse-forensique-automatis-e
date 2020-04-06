@@ -55,8 +55,33 @@ class Trame:
         elif(self.port_src==21 or self.port_dst==21):
             self.setFtpAttributs(packet)
     def setDnsAttributs(self,packet):
-        print("TODO DNS")
-        packet.show()
+        opcodes={
+            0:"QUERY",
+            1:"IQUERY",
+            2:"STATUS",
+        }
+        qrcodes={
+            0:"ok",
+            1:"format-error",
+            2:"server-failure",
+            3:"name-error",
+            4:"not-implemented",
+            5:"refused",
+        }
+        self.opcode=opcodes[packet["DNS"].opcode]
+        self.qrcode=qrcodes[packet["DNS"].qr]
+
+        self.protocol="DNS"
+        
+        self.qdcount=packet["DNS"].qdcount  # DNS Question Record
+        self.ancount=packet["DNS"].ancount  # DNS Resource Record
+        self.nscount=packet["DNS"].nscount  # DNS SOA Resource Record
+        self.arcount=packet["DNS"].arcount  # DNS
+        self.qd=packet["DNS"].qd
+        self.an=packet["DNS"].an
+        self.ns=packet["DNS"].ns
+        self.ar=packet["DNS"].ar
+    
     def setFtpAttributs(self,packet):
         self.protocol="FTP"
         self.ftp_request=str(packet["Raw"].load)
