@@ -111,17 +111,17 @@ class NetworkAnalyzer():
             port_src = frame.port_src
             port_dst = frame.port_dst
             if frame.protocol=="TCP":
-            # SYN flag
-            if frame.flags==["SYN"]:
-                if (ip_src, ip_dst) not in scan_report:
-                    scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
-                scan_report[(ip_src, ip_dst)][0].add(port_dst)
-            # SYN ACK flags
-            elif frame.flags==["SYN","ACK"] and (ip_dst, ip_src) in scan_report:
-                scan_report[(ip_dst, ip_src)][2].add(port_src)
-            # RST ACK flags
-            elif frame.flags==["RST","ACK"] and (ip_dst, ip_src) in scan_report:
-                scan_report[(ip_dst, ip_src)][1].add(port_src)
+                # SYN flag
+                if frame.flags==["SYN"]:
+                    if (ip_src, ip_dst) not in scan_report:
+                        scan_report.setdefault((ip_src, ip_dst), [set(),set(),set()])
+                    scan_report[(ip_src, ip_dst)][0].add(port_dst)
+                # SYN ACK flags
+                elif frame.flags==["SYN","ACK"] and (ip_dst, ip_src) in scan_report:
+                    scan_report[(ip_dst, ip_src)][2].add(port_src)
+                # RST ACK flags
+                elif frame.flags==["RST","ACK"] and (ip_dst, ip_src) in scan_report:
+                    scan_report[(ip_dst, ip_src)][1].add(port_src)
 
         # Sort all ports sets for each (ip_attacker, ip_target), sorted function return a sorted list
         for k in scan_report:
@@ -454,5 +454,89 @@ class NetworkAnalyzer():
 
         else:
             print('\n'+30*'-'+'NO ARP NETWORK SCAN DETECTED '+30*'-')
+
+        return scan_report
+
+
+    def detectTcpFlood(self, minTcpFrame=10000, nbIpToShow=10):
+        """
+        Detect a TCP flood attack (DDoS/DoS) captured in a pcap file
+
+        ---------- NORMAL 3-WAY HAND-SHAKE ----------
+
+        attacker -----  SYN  ----> target
+        attacker <----SYN-ACK----- target
+        attacker -----  ACK  ----> target
+
+        ---------- SYN FLOOD ATTACK ----------
+
+        Port considered opened:
+
+        attacker -----  SYN  ----> target
+        attacker -----  SYN  ----> target
+        attacker -----  SYN  ----> target
+                        ...
+        
+        attacker <----SYN-ACK----- target
+        attacker <----SYN-ACK----- target
+        attacker <----SYN-ACK----- target
+                        ...
+        
+        Others flags can be used in a TCP flood attack.
+
+        Souces IP can be spoofed. Example of command using hping3:
+        hping3 -c 1000 -d 120 -S -w 64 -p 22 --flood --rand-source ip_target
+
+        Return a report :
+
+        {(ip_target1, port_target1): [nbTcpFrameRcv1, ip_attacker1, start_line1, end_line1],
+        (ip_target2, port_target2): [nbTcpFrameRcv2, ip_attacker2, start_line2, end_line2],
+        ..., 
+        (ip_targetN, port_targetN): [nbTcpFrameRcvN, ip_attackerN, start_lineN, end_lineN]}
+
+        nbTcpFrameRcv (int) is a counter of TCP frame received by the target from all attackers
+        ip_attacker is a list of str, it contains all IP adresses that sent TCP request to the target
+        start_line (int) is the first number of the line that use TCP protocol
+        end_line (int) is the last number of the line that use TCP protocol
+        """
+        t = time.time()
+        scan_report = dict()
+        pcap_file = rdpcap(self.path)
+
+        # Read all frames of the pcap file
+        for i,frame in enumerate(pcap_file):
+            layers = frame.layers()
+
+            if len(layers) > 2 and layers[2].__name__ == 'TCP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+                port_dst = frame[TCP].dport
+
+                if (ip_dst, port_dst) not in scan_report:
+                    scan_report.setdefault((ip_dst, port_dst), [0, set(), 0, 0]) # key: (ip_dst, port_dst) -> [nb_SYN_flag, ip_attackers, start_line, end_line]
+                    scan_report[(ip_dst, port_dst)][2] = i+1
+                scan_report[(ip_dst, port_dst)][0] += 1
+                scan_report[(ip_dst, port_dst)][1].add(ip_src)
+                scan_report[(ip_dst, port_dst)][3] = i+1
+
+        # Display the scan report
+        if scan_report:
+            print('\n'+30*'-'+' TCP FLOOD DETECTED '+30*'-')
+
+            for (ip_dst, port_dst) in scan_report:
+                nbTcpFrameRcv = scan_report[(ip_dst, port_dst)][0]
+                if nbTcpFrameRcv > minTcpFrame:
+                    start_line = scan_report[(ip_dst, port_dst)][2]
+                    end_line = scan_report[(ip_dst, port_dst)][3]
+                    print('\nTarget : {} on port {}'.format(ip_dst, port_dst))
+                    print('{} TCP frames received from line {} to {} (wireshark)'.format(nbTcpFrameRcv, start_line, end_line))
+
+                    if len(scan_report[(ip_dst, port_dst)][1]) < nbIpToShow:
+                        print('IP attacker(s):', ' '.join(scan_report[(ip_dst, port_dst)][1]))
+
+        else:
+            print('\n'+30*'-'+' NO TCP FLOOD DETECTED '+30*'-')
+
+        print('Scanning time: ', str(time.time()-t), ' seconds')
 
         return scan_report
