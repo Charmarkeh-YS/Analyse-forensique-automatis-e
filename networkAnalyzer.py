@@ -1,5 +1,5 @@
 #-*-coding:utf-8-*-
-from trame import TrameV2
+from trameV2 import Trame
 from scapy.all import *
 from user import User
 import time
