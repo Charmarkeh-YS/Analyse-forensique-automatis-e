@@ -5,10 +5,10 @@ class Trame:
     def __init__(self,packet,identifiant):
         self.poids=0
         self.id=identifiant
-        print("Creating frame {}...".format(self.id))
+        #print("Creating frame {}...".format(self.id))
         self.layers=packet.layers()
         self.protocol="Ethernet"
-        print(self.layers)
+        #print(self.layers)
         for i,layer in enumerate(self.layers):
             current_layer=layer.__name__
 
@@ -19,8 +19,7 @@ class Trame:
             if(current_layer!="IP" and current_layer!="ARP" and i==1):
                 print("Second layer of frame {} is not IP or ARP -> need an upgrade".format(self.id))
             
-            # -----------------------------------------------------------------------------------------------
-            
+            # ----------------------------------------------------------------------------------------------- 
             functions_layer={
                 "Ether" : self.setEthernetAttributs,
                 "ARP" : self.setArpAttributs,
@@ -41,9 +40,25 @@ class Trame:
                 "Skinny" : self.doNothing,
                 "ICMPv6ND_NA" : self.doNothing,
                 "ICMPv6NDOptDstLLAddr" : self.doNothing,
+                "DHCP6_Solicit" : self.doNothing,
+                "DHCP6OptElapsedTime" : self.doNothing,
+                "DHCP6OptClientId" : self.doNothing,
+                "DHCP6OptIA_NA": self.doNothing,
+                "DHCP6OptOptReq" : self.doNothing,
+                "DHCP6OptClientFQDN" : self.doNothing,
+                "ICMPv6ND_RA": self.doNothing,
+                "ICMPv6NDOptDNSSL": self.doNothing,
+                "ICMPv6NDOptMTU": self.doNothing,
+                "ICMPv6NDOptPrefixInfo": self.doNothing,
+                "ICMPv6NDOptRDNSS": self.doNothing,
+                "IPv6ExtHdrHopByHop":self.doNothing,
+                "ICMPv6MLReport2": self.doNothing,
             }
-
-            functions_layer[current_layer](packet)
+            try:
+                functions_layer[current_layer](packet)
+            except Exception as e:
+                print("Frame {}".format(self.id))
+                print("Error in functons_layer : {} | Probably an unknown protocol {}".format(e,current_layer))
     def setEthernetAttributs(self,packet):
         self.mac_src=packet["Ethernet"].src
         self.mac_dst=packet["Ethernet"].dst

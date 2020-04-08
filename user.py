@@ -26,7 +26,10 @@ class User:
         self.userTramesList=[]
         self.suspect=False
         self.macAddr=macAddr
-        self.ipAddr=listTrames[0].ip_src             # ATTENTION : LISTE
+        for trame in listTrames:
+            if(hasattr(trame,"ip_src")):
+                self.ipAddr=trame.ip_src             # ATTENTION : LISTE
+                break
 
         protocoles=[("TCP",self.tcpCount),("UDP",self.udpCount),("IP",self.ipCount),("ARP",self.arpCount),
                 ("DHCP",self.dhcpCount),("NTLM",self.ntlmCount),("SMTP",self.smtpCount),
