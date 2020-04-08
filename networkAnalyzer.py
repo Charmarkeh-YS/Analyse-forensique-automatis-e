@@ -38,8 +38,8 @@ class NetworkAnalyzer():
             print("Temps exec : {} secondes".format(time.time()-t))
             # Initialise la variable userList
             t2=0
-            print("Initialisation de la liste des user...")
             if(initUsers==True):
+                print("Initialisation de la liste des user...")
                 t2=time.time()
                 self.initializeUserList()
                 print("Temps exec : {} secondes".format(time.time()-t2))
@@ -108,6 +108,25 @@ class NetworkAnalyzer():
             self.userList.append(user)
 
 #************************************ ATTACKS DETECTION METHODS **************************************
+    def detectIpUsurpation(self):
+        start_time=time.time()
+        print("\n"+30*"-"+" DETECTION IP USURPATION " + "-"*30)
+        ipSet=[]
+        suspiscious=False
+        for user in self.userList:
+            for ip in user.ipAddr:
+                if(len(ipSet)==0):
+                    ipSet.append((user.macAddr,ip))
+                else:
+                    for mac, ip in ipSet:
+                        if(mac!=user.macAddr and ip==user.macAddr):
+                            print("IP Adresse {} dupplicated on mac {} and {}".format(ip,mac,user.macAddr))
+                            suspiscious=True
+                    ipSet.append((user.macAddr,ip))
+        if(suspiscious):
+            print("\n"+30*"-"+" IP USURPATION DETECTED " + "-"*30)
+        else:
+            print("\n"+30*"-"+" NO IP USURPATION " + "-"*30)
     def detectTcpPortScanWithTrame(self):
         start_time = time.time()
         scan_report= dict()
