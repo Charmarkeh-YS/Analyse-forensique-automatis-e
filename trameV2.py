@@ -32,27 +32,11 @@ class Trame:
                 "ICMP" : self.setIcmpAttributs,
                 "BOOTP" : self.setDhcpAttributs,
                 "DHCP" : self.doNothing,
+                "IPerror": self.setIpErrorAttributs,
+                "UDPerror":self.setUdpErrorAttributs,
                 "IPv6" : self.doNothing,
-                "IPv6ND_NS" : self.doNothing,
-                "ICMPv6ND_NS" : self.doNothing,
-                "ICMPv6NDOptSrcLLAddr" : self.doNothing,
                 "PPTP" : self.doNothing,
                 "Skinny" : self.doNothing,
-                "ICMPv6ND_NA" : self.doNothing,
-                "ICMPv6NDOptDstLLAddr" : self.doNothing,
-                "DHCP6_Solicit" : self.doNothing,
-                "DHCP6OptElapsedTime" : self.doNothing,
-                "DHCP6OptClientId" : self.doNothing,
-                "DHCP6OptIA_NA": self.doNothing,
-                "DHCP6OptOptReq" : self.doNothing,
-                "DHCP6OptClientFQDN" : self.doNothing,
-                "ICMPv6ND_RA": self.doNothing,
-                "ICMPv6NDOptDNSSL": self.doNothing,
-                "ICMPv6NDOptMTU": self.doNothing,
-                "ICMPv6NDOptPrefixInfo": self.doNothing,
-                "ICMPv6NDOptRDNSS": self.doNothing,
-                "IPv6ExtHdrHopByHop":self.doNothing,
-                "ICMPv6MLReport2": self.doNothing,
             }
             try:
                 functions_layer[current_layer](packet)
@@ -63,6 +47,10 @@ class Trame:
         self.mac_src=packet["Ethernet"].src
         self.mac_dst=packet["Ethernet"].dst
         self.type=packet["Ethernet"].type
+    def setIpErrorAttributs(self,packet):
+        print("TODO IP ERROR")
+    def setUdpErrorAttributs(self,packet):
+        print("TODO UDP ERROR")
     def setRawAttributs(self,packet):
         self.data=packet["Raw"].load
         if(hasattr(self,"port_src")):
@@ -136,6 +124,7 @@ class Trame:
             2 : "Offer",
             3 : "Request",
             5 : "Ack",
+            8 : "Bootrequest",
         }
         try:
             self.option=dhcp_options[packet["DHCP options"].options[0][1]]
@@ -189,6 +178,7 @@ class Trame:
         self.protocol="ICMP"
         icmp_types= {
             0 : "Reply",
+            3 : "Destination unreacheable",
             8: "Request",
         }
         try:

@@ -113,18 +113,20 @@ class NetworkAnalyzer():
         print("\n"+30*"-"+" DETECTION IP USURPATION " + "-"*30)
         ipSet=[]
         suspiscious=False
-        for user in self.userList:
+        rapport=""
+        for user in self.userList: 
             for ip in user.ipAddr:
                 if(len(ipSet)==0):
                     ipSet.append((user.macAddr,ip))
                 else:
-                    for mac, ip in ipSet:
-                        if(mac!=user.macAddr and ip==user.macAddr):
-                            print("IP Adresse {} dupplicated on mac {} and {}".format(ip,mac,user.macAddr))
+                    for mac, ip2 in ipSet:
+                        if(mac!=user.macAddr and ip2==ip):
+                            rapport+="IP Adresse {} dupplicated on mac {} and {}\n".format(ip2,mac,user.macAddr)
                             suspiscious=True
                     ipSet.append((user.macAddr,ip))
         if(suspiscious):
             print("\n"+30*"-"+" IP USURPATION DETECTED " + "-"*30)
+            print(rapport)
         else:
             print("\n"+30*"-"+" NO IP USURPATION " + "-"*30)
     def detectTcpPortScanWithTrame(self):

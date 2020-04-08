@@ -9,8 +9,8 @@ def main():
     #lib_forensique.detectTcpFlood(path='Pcaps/synflood.pcap') # Test the detection of TCP SYN flood
     print("Fin lib forensic")
 
-    handler = NetworkAnalyzer("./Pcaps/synflood.pcap")
-    handler.detectTcpFlood()
+    handler = NetworkAnalyzer("./Pcaps/usurpationIp.pcap")
+    handler.detectIpUsurpation()
     #handler.detectTcpPortScan()
     #handler.detectInverseTcpPortScan()
     #handler.detectUdpPortScan()
