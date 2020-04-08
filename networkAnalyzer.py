@@ -18,7 +18,7 @@ class NetworkAnalyzer():
     #--- Un compteur pour chaque type de protocole pour cet utilisateur
 
 #************************************ CONSTRUCTEUR / DESTRUCTEUR *************************************
-    def __init__(self, path):
+    def __init__(self, path,initUsers=True):
         self.frameList=[]
         self.userList=[]
         self.nbFrame=0
@@ -32,11 +32,18 @@ class NetworkAnalyzer():
 
         else:
             print("Reading {}".format(path))
+            t=time.time()
             print("Inialisation de l'objet...")
             self.initializeFrameList()
+            print("Temps exec : {} secondes".format(time.time()-t))
             # Initialise la variable userList
+            t2=0
             print("Initialisation de la liste des user...")
-            self.initializeUserList()
+            if(initUsers==True):
+                t2=time.time()
+                self.initializeUserList()
+                print("Temps exec : {} secondes".format(time.time()-t2))
+            print("Objet construit en {} secondes".format(t+t2))
             print("Analyser built")
     def __del__(self):
         print("Deleting analyser...")

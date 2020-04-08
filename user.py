@@ -42,5 +42,6 @@ class User:
                     new_tuple=(proto[0],proto[1]+1)
                     proto=new_tuple
             # Idée temporaire pour détecter suspiscion de changement suspect d'adresse ip
-            if(trame.ip_src!=self.ipAddr):
-                self.suspect=True
+            if(hasattr(trame,"ip_src")):
+                if(trame.ip_src!=self.ipAddr):
+                    self.suspect=True
