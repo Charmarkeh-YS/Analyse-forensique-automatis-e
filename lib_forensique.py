@@ -1,5 +1,6 @@
 from scapy.all import *
-from time import time
+import time
+import binascii
 
 def detectTcpPortScan(path):
     """
@@ -37,7 +38,7 @@ def detectTcpPortScan(path):
     
     attacker -----  SYN  ----> target
 
-    Return a report :
+    Return a report (dict):
 
     {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,opened_ports1],
     (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,opened_ports2],
@@ -51,7 +52,8 @@ def detectTcpPortScan(path):
 
     opened_ports is an int list of port where TCP flag is SYN-ACK
     """
-    pcap_file = rdpcap(path)
+    t = time.time()
+    pcap_file = rdpcap(path) # Take a long time
     scan_report = dict()  # scan_report has this shape : {(ip_origin1, ip_traget1): [scanned_ports1,closed_ports1,opened_ports1], (ip_origin2, ip_traget2): [scanned_ports2,closed_ports2,opened_ports2], ..., (ip_originN, ip_tragetN): [scanned_portsN,closed_portsN,opened_portsN]}
 
     # Read all frames of the pcap file
@@ -103,12 +105,60 @@ def detectTcpPortScan(path):
     else:
         print('\n'+30*'-'+'NO TCP PORTS SCAN DETECTED '+30*'-')
 
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
     return scan_report
 
 
 def detectTcpPortScan2(path):
+    """
+    Detect a TCP ports scan captured in a pcap file (Inverse TCP flag)
+
+    ---------- VANILLA CONNECT ----------
+
+    Port considered opened:
+
+    attacker -----  SYN  ----> target
+    attacker <----SYN-ACK----- target
+    attacker -----  ACK  ----> target
+
+    Port considered closed:
+    attacker -----  SYN  ----> target
+    attacker <----RST-ACK----- target
+
+    Port considered filtered:
+
+    attacker -----  SYN  ----> target
+
+    ---------- INVERSE TCP FLAG ----------
+
+    Port considered closed:
+    attacker ----- FIN-PSH-URG-NULL ----> target
+    attacker <----     RST-ACK      ----- target
+
+    Port considered open | filtered:
+    
+    attacker ----- FIN-PSH-URG-NULL ----> target
+
+    Other flags can be used like NULL or FIN.
+
+    Return a report (dict):
+
+    {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,op_fil_ports1],
+    (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,op_fil_ports2],
+    ..., 
+    (ip_attackerN, ip_targetN): [scanned_portsN,closed_portsN,op_fil_portsN]}
+
+    scanned_ports is an int list of target ports, port are append into the list
+    if the TCP flag is FIN-PSH-URG-NULL or NULL or FIN . All those flags are considered suspicious.
+
+    closed_ports is an int list of port where TCP flag is RST-ACK
+
+    op_fil_ports is an int list of port where target did not send a response
+    """
+    t = time.time()
     pcap_file = rdpcap(path)
-    scan_report = dict()  # scan_report has this shape : {(ip_origin1, ip_traget1): [scanned_ports1,closed_ports1,opened_ports1], (ip_origin2, ip_traget2): [scanned_ports2,closed_ports2,opened_ports2], ..., (ip_originN, ip_tragetN): [scanned_portsN,closed_portsN,opened_portsN]}
+    scan_report = dict()
 
     # Read all frames of the pcap file
     for frame in pcap_file:
@@ -155,10 +205,42 @@ def detectTcpPortScan2(path):
     else:
         print('\n'+30*'-'+'NO INVERSE TCP PORTS SCAN DETECTED '+30*'-')
 
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
     return scan_report
 
 
 def detectUdpPortScan(path):
+    """
+    Detect an UDP ports scan captured in a pcap file (Inverse TCP flag)
+
+    ---------- UDP PORT SCAN ----------
+
+    Port considered closed:
+    attacker -------------------- UDP -------------------> target
+    attacker <---- ICMP destiantion port unreachable ----- target
+
+    Port considered open | filtered:
+    
+    attacker ----- UDP ----> target
+
+    Other flags can be used like NULL or FIN.
+
+    Return a report (dict):
+
+    {(ip_attacker1, ip_target1): [scanned_ports1,closed_ports1,op_fil_ports1],
+    (ip_attacker2, ip_target2): [scanned_ports2,closed_ports2,op_fil_ports2],
+    ..., 
+    (ip_attackerN, ip_targetN): [scanned_portsN,closed_portsN,op_fil_portsN]}
+
+    scanned_ports is an int list of target ports, port are append into the list
+    if the if the target receives an UDP frame.
+
+    closed_ports is an int list of port where the target send an ICMP port unreachable frame
+
+    op_fil_ports is an int list of port where target did not send a response
+    """
+    t = time.time()
     pcap_file = rdpcap(path)
     scan_report = dict()  # scan_report has this shape : {(ip_origin1, ip_traget1): [scanned_ports1,closed_ports1,opened_filtered_ports1], (ip_origin2, ip_traget2): [scanned_ports2,closed_ports2,opened_filtered_ports2], ..., (ip_originN, ip_tragetN): [scanned_portsN,closed_portsN,opened_filtered_portsN]}
 
@@ -211,12 +293,46 @@ def detectUdpPortScan(path):
     else:
         print('\n'+30*'-'+'NO UDP PORTS SCAN DETECTED '+30*'-')
 
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
     return scan_report
 
 
 def detectNetworkArpScan(path):
+    """
+    Detect a network ARP scan captured in a pcap file
+
+    ---------- NETWORK ARP  SCAN ----------
+
+    ARP request in broadcast :
+                                            192.168.1.0
+    attacker ----- Who has 192.168.1.1 ? ----> |
+    attacker ----- Who has 192.168.1.2 ? ----> |
+                            ...                |
+    attacker ---- Who has 192.168.1.254 ? ---> |
+
+
+    ARP reply:
+
+    attacker <--- IP_target1 is at MAC_addr1 ---- target1
+    attacker <--- IP_target2 is at MAC_addr2 ---- target2
+                            ...
+    attacker <--- IP_targetN is at MAC_addrN ---- targetN
+
+    Return a report (dict):
+
+    {ip_attacker1: [ARP_request1, ARP_reply1],
+    ip_attacker2: [ARP_request2, ARP_reply2],
+    ..., 
+    ip_attackerN: [ARP_requestN, ARP_replyN],}
+
+    ARP_request is a list of string, strings are IP addresses sent by the attacker to know its owner
+
+    ARP_reply is a list of string, strings are IP addresses of each machines who reply at the attacker's requests
+    """
+    t = time.time()
     pcap_file = rdpcap(path)
-    scan_report = dict()  # scan_report has this shape : 
+    scan_report = dict()
 
     # Read all frames of the pcap file
     for frame in pcap_file:
@@ -252,12 +368,14 @@ def detectNetworkArpScan(path):
     else:
         print('\n'+30*'-'+'NO ARP NETWORK SCAN DETECTED '+30*'-')
 
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
     return scan_report
 
 
-def detectTcpFlood(path, minTcpFrame=10000, nbIpToShow=10):
+def detectTcpUdpFlood(path, minFrame=100000, maxIpToShow=10): # minFrame=100000, maxIpToShow=10
     """
-    Detect a TCP flood attack (DDoS/DoS) captured in a pcap file
+    Detect a TCP/UDP flood attack (DDoS/DoS) captured in a pcap file
 
     ---------- NORMAL 3-WAY HAND-SHAKE ----------
 
@@ -267,7 +385,7 @@ def detectTcpFlood(path, minTcpFrame=10000, nbIpToShow=10):
 
     ---------- SYN FLOOD ATTACK ----------
 
-    Port considered opened:
+    (For ports considered open)
 
     attacker -----  SYN  ----> target
     attacker -----  SYN  ----> target
@@ -278,25 +396,44 @@ def detectTcpFlood(path, minTcpFrame=10000, nbIpToShow=10):
     attacker <----SYN-ACK----- target
     attacker <----SYN-ACK----- target
                     ...
-    
+
     Others flags can be used in a TCP flood attack.
 
-    Souces IP can be spoofed. Example of command using hping3:
+    ---------- UDP FLOOD ATTACK ----------
+
+    (For ports considered open)
+
+    attacker ---------> target
+    attacker ---------> target
+    attacker ---------> target
+                ...
+
+    Souces IP can be spoofed. Example of command using hping3 for TCP SYN flood:
     hping3 -c 1000 -d 120 -S -w 64 -p 22 --flood --rand-source ip_target
+
+    Other example for UDP flood:
+    hping3 -2 -c 1000 -p 22 --flood ip_target
+
+    Parameters in input:
+
+    minFrame (int) is the minimum of frame recorded to show the report for a target
+    maxIpToShow (int) is the maximum number of attackers IP to show for a target
 
     Return a report :
 
-    {(ip_target1, port_target1): [nbTcpFrameRcv1, ip_attacker1, start_line1, end_line1],
-    (ip_target2, port_target2): [nbTcpFrameRcv2, ip_attacker2, start_line2, end_line2],
+    {(ip_target1, port_target1): [nbFrameRecord1, ip_attacker1, start_line1, end_line1, protocol_l4],
+    (ip_target2, port_target2): [nbFrameRecord2, ip_attacker2, start_line2, end_line2, protocol_l4],
     ..., 
-    (ip_targetN, port_targetN): [nbTcpFrameRcvN, ip_attackerN, start_lineN, end_lineN]}
+    (ip_targetN, port_targetN): [nbFrameRecordN, ip_attackerN, start_lineN, end_lineN, protocol_l4]}
 
-    nbTcpFrameRcv (int) is a counter of TCP frame received by the target from all attackers
+    nbFrameRecord (int) is a counter of TCP frame received by the target from all attackers
     ip_attacker is a list of str, it contains all IP adresses that sent TCP request to the target
     start_line (int) is the first number of the line that use TCP protocol
     end_line (int) is the last number of the line that use TCP protocol
+    protocol_l4 (str) is the protocol of layer 4 used for the (D)DoS attack
     """
-    t = time()
+
+    t = time.time()
     scan_report = dict()
     pcap_file = rdpcap(path)
 
@@ -304,13 +441,19 @@ def detectTcpFlood(path, minTcpFrame=10000, nbIpToShow=10):
     for i,frame in enumerate(pcap_file):
         layers = frame.layers()
 
-        if len(layers) > 2 and layers[2].__name__ == 'TCP':
+        if len(layers) > 2 and layers[2].__name__ in ['TCP', 'UDP'] and layers[1].__name__ == 'IP':
             ip_src = frame[IP].src
             ip_dst = frame[IP].dst
-            port_dst = frame[TCP].dport
+            protocol_l4 = layers[2].__name__ # Protocol of layer 4
+
+            if protocol_l4 == 'TCP':
+                port_dst = frame[TCP].dport
+
+            elif protocol_l4 == 'UDP':
+                port_dst = frame[UDP].dport
 
             if (ip_dst, port_dst) not in scan_report:
-                scan_report.setdefault((ip_dst, port_dst), [0, set(), 0, 0]) # key: (ip_dst, port_dst) -> [nb_SYN_flag, ip_attackers, start_line, end_line]
+                scan_report.setdefault((ip_dst, port_dst), [0, set(), 0, 0, protocol_l4]) # key: (ip_dst, port_dst) -> [nb_SYN_flag, ip_attackers, start_line, end_line, protocol_l4]
                 scan_report[(ip_dst, port_dst)][2] = i+1
             scan_report[(ip_dst, port_dst)][0] += 1
             scan_report[(ip_dst, port_dst)][1].add(ip_src)
@@ -318,22 +461,186 @@ def detectTcpFlood(path, minTcpFrame=10000, nbIpToShow=10):
 
     # Display the scan report
     if scan_report:
-        print('\n'+30*'-'+' TCP FLOOD DETECTED '+30*'-')
+        print('\n'+30*'-'+' TCP/UDP FLOOD DETECTED '+30*'-')
 
         for (ip_dst, port_dst) in scan_report:
-            nbTcpFrameRcv = scan_report[(ip_dst, port_dst)][0]
-            if nbTcpFrameRcv > minTcpFrame:
+            nbFrameRecord = scan_report[(ip_dst, port_dst)][0]
+            if nbFrameRecord > minFrame:
                 start_line = scan_report[(ip_dst, port_dst)][2]
                 end_line = scan_report[(ip_dst, port_dst)][3]
+                protocol_l4 = scan_report[(ip_dst, port_dst)][4]
                 print('\nTarget : {} on port {}'.format(ip_dst, port_dst))
-                print('{} TCP frames received from line {} to {} (wireshark)'.format(nbTcpFrameRcv, start_line, end_line))
+                print('{} {} frames received from line {} to {} (wireshark)'.format(nbFrameRecord, protocol_l4, start_line, end_line))
 
-                if len(scan_report[(ip_dst, port_dst)][1]) < nbIpToShow:
+                if len(scan_report[(ip_dst, port_dst)][1]) < maxIpToShow:
                     print('IP attacker(s):', ' '.join(scan_report[(ip_dst, port_dst)][1]))
 
     else:
-        print('\n'+30*'-'+' NO TCP FLOOD DETECTED '+30*'-')
+        print('\n'+30*'-'+' NO TCP/UDP FLOOD DETECTED '+30*'-')
 
-    print('Scanning time: ', str(time()-t), ' seconds')
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
+    return scan_report
+
+
+def detectDnsRequestFlood(path, minFrame=100000, maxIpToShow=10): # minFrame=100000, maxIpToShow=10
+    """
+    Detect a DNS request flood attack (DDoS/DoS) captured in a pcap file
+
+    ---------- STANDART DNS QUERY ----------
+
+    attacker ----- DNS request ----> target
+    attacker <----  DNS reply  ----- target
+
+    ---------- DNS REQUEST FLOOD ATTACK ----------
+
+    attacker ----- DNS request ----> target
+    attacker ----- DNS request ----> target
+    attacker ----- DNS request ----> target
+                        ...
+
+    attacker <----  DNS reply  ----- target
+    attacker <----  DNS reply  ----- target
+    attacker <----  DNS reply  ----- target
+                        ...
+
+    Parameters in input:
+
+    minFrame (int) is the minimum of frame recorded to show the report for a target
+    maxIpToShow (int) is the maximum number of attackers IP to show for a target
+
+    Return a report :
+
+    {(ip_target1, port_target1): [nbFrameRecord1, ip_attacker1, start_line1, end_line1],
+    (ip_target2, port_target2): [nbFrameRecord2, ip_attacker2, start_line2, end_line2],
+    ..., 
+    (ip_targetN, port_targetN): [nbFrameRecordN, ip_attackerN, start_lineN, end_lineN]}
+
+    nbFrameRecord (int) is a counter of DNS request frame received by the target from all attackers
+    ip_attacker is a list of str, it contains all IP adresses that sent DNS request to the target
+    start_line (int) is the first number of the line where the frame is a DNS request for a target
+    end_line (int) is the last number of the line where the frame is a DNS request for a target
+    """
+    t = time.time()
+    scan_report = dict()
+    pcap_file = rdpcap(path)
+
+    # Read all frames of the pcap file
+    for i,frame in enumerate(pcap_file):
+        layers = frame.layers()
+
+        if len(layers) > 3 and layers[3].__name__ == 'DNS' and frame[DNS].qr == 0 and layers[1].__name__ == 'IP':
+            ip_src = frame[IP].src
+            ip_dst = frame[IP].dst
+
+            if ip_dst not in scan_report:
+                scan_report.setdefault(ip_dst, [0, set(), 0, 0]) # key: ip_dst -> [nb_DNS_request, ip_attackers, start_line, end_line]
+                scan_report[ip_dst][2] = i+1
+            scan_report[ip_dst][0] += 1
+            scan_report[ip_dst][1].add(ip_src)
+            scan_report[ip_dst][3] = i+1
+
+    # Display the scan report
+    if scan_report:
+        print('\n'+30*'-'+' DNS FLOOD DETECTED '+30*'-')
+
+        for ip_dst in scan_report:
+            nbFrameRecord = scan_report[ip_dst][0]
+            if nbFrameRecord > minFrame:
+                start_line = scan_report[ip_dst][2]
+                end_line = scan_report[ip_dst][3]
+                print('\nTarget : {}'.format(ip_dst))
+                print('{} DNS frames received from line {} to {} (wireshark)'.format(nbFrameRecord, start_line, end_line))
+
+                if len(scan_report[ip_dst][1]) < maxIpToShow:
+                    print('IP attacker(s):', ' '.join(scan_report[ip_dst][1]))
+
+    else:
+        print('\n'+30*'-'+' NO DNS FLOOD DETECTED '+30*'-')
+
+    print('Detecting time: ', str(time.time()-t), ' seconds')
+
+    return scan_report
+
+
+def detectHttpGetFlood(path, minFrame=0, maxIpToShow=10): # minFrame=100000, maxIpToShow=10
+    """
+    Detect a HTTP Get flood attack (DDoS/DoS) captured in a pcap file
+
+    ---------- STANDART HTTP QUERY ----------
+
+    attacker -----  HTTP GET  ----> target
+    attacker <---- HTTP reply ----- target
+
+    ---------- HTTP GET FLOOD ATTACK ----------
+
+    attacker -----  HTTP GET  ----> target
+    attacker -----  HTTP GET  ----> target
+    attacker -----  HTTP GET  ----> target
+                        ...
+
+    attacker <---- HTTP reply ----- target
+    attacker <---- HTTP reply ----- target
+    attacker <---- HTTP reply ----- target
+                        ...
+
+    Parameters in input:
+
+    minFrame (int) is the minimum of frame recorded to show the report for a target
+    maxIpToShow (int) is the maximum number of attackers IP to show for a target
+
+    Return a report :
+
+    {(ip_target1, port_target1): [nbFrameRecord1, ip_attacker1, start_line1, end_line1],
+    (ip_target2, port_target2): [nbFrameRecord2, ip_attacker2, start_line2, end_line2],
+    ..., 
+    (ip_targetN, port_targetN): [nbFrameRecordN, ip_attackerN, start_lineN, end_lineN]}
+
+    nbFrameRecord (int) is a counter of HTTP Get frame received by the target from all attackers
+    ip_attacker is a list of str, it contains all IP adresses that sent HTTP Get to the target
+    start_line (int) is the first number of the line where the frame is a HTTP Get for a target
+    end_line (int) is the last number of the line where the frame is a HTTP Get for a target
+    """
+    t = time.time()
+    scan_report = dict()
+    pcap_file = rdpcap(path)
+
+    # Read all frames of the pcap file
+    for i,frame in enumerate(pcap_file):
+        layers = frame.layers()
+
+        if len(layers) > 3 and layers[3].__name__ == 'Raw':
+            data = binascii.hexlify(bytes(frame[Raw].load)) # Get the data
+            if data[:6] == b'474554': # If the data begin with a HTTP GET ('GET' = b'474554')
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+
+                if ip_dst not in scan_report:
+                    scan_report.setdefault(ip_dst, [0, set(), 0, 0]) # key: ip_dst -> [nb_HTTP_GET, ip_attackers, start_line, end_line]
+                    scan_report[ip_dst][2] = i+1
+                scan_report[ip_dst][0] += 1
+                scan_report[ip_dst][1].add(ip_src)
+                scan_report[ip_dst][3] = i+1
+
+    # Display the scan report
+    if scan_report:
+        print('\n'+30*'-'+' HTTP GET FLOOD DETECTED '+30*'-')
+
+        for ip_dst in scan_report:
+            nbFrameRecord = scan_report[ip_dst][0]
+            if nbFrameRecord > minFrame:
+                start_line = scan_report[ip_dst][2]
+                end_line = scan_report[ip_dst][3]
+
+                print('\nTarget : {}'.format(ip_dst))
+                print('{} HTTP Get frames received from line {} to {} (wireshark)'.format(nbFrameRecord, start_line, end_line))
+
+                if len(scan_report[ip_dst][1]) < maxIpToShow:
+                    print('IP attacker(s):', ' '.join(scan_report[ip_dst][1]))
+
+    else:
+        print('\n'+30*'-'+' NO HTTP GET FLOOD DETECTED '+30*'-')
+
+    print('Detecting time: ', str(time.time()-t), ' seconds')
 
     return scan_report
