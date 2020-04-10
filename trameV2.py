@@ -104,7 +104,8 @@ class Trame:
         self.an=packet["DNS"].an
         self.ns=packet["DNS"].ns
         self.ar=packet["DNS"].ar
-    
+    def setTlsAttributs(self,packet):
+        self.protocol="TLS"
     def setFtpAttributs(self,packet):
         self.protocol="FTP"
         self.ftp_request=str(packet["Raw"].load)
@@ -113,6 +114,10 @@ class Trame:
         print("TODO FTP-Data")
     def setSshAttributs(self,packet):
         self.protocol="SSH"
+        self.ssh_key_exchange_init=False
+        # On repère le protocol "Key exchange init"
+        if(self.data[5]==20):
+            self.ssh_key_exchange_init=True
     def setTelnetAttributs(self,packet):
         self.protocol="TELNET"
     def setPaddingAttributs(self,packet):

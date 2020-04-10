@@ -108,6 +108,20 @@ class NetworkAnalyzer():
             self.userList.append(user)
 
 #************************************ ATTACKS DETECTION METHODS **************************************
+    def detectSshBruteForceAttack(self):
+        start_time=time.time()
+        print("\n"+30*"-"+" DETECTION SSH BRUTE FORCE ATTACK " + "-"*30)
+        report=""
+        for user in self.userList:
+            counter=0
+            for trame in user.userTramesList:
+                if(trame.protocol=="SSH" and trame.port_dst==22):
+                    if(trame.ssh_key_exchange_init==True):
+                        counter+=1
+            if(counter>3):      # Nombre complètement arbitraire
+                report+="User with mac adress {} and ip {} is suspect. More than {} try.\n".format(user.macAddr,user.ipAddr,counter*2)
+        print(report)
+        print("\n"+30*"-"+" DETECTION DONE " + "-"*30)
     def detectIpUsurpation(self):
         start_time=time.time()
         print("\n"+30*"-"+" DETECTION IP USURPATION " + "-"*30)
