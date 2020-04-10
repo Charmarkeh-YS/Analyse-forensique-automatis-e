@@ -1,5 +1,5 @@
 #-*-coding:utf-8-*-
-from trame import Trame
+from trameV2 import Trame
 from scapy.all import *
 from user import User
 import time
@@ -18,7 +18,7 @@ class NetworkAnalyzer():
     #--- Un compteur pour chaque type de protocole pour cet utilisateur
 
 #************************************ CONSTRUCTEUR / DESTRUCTEUR *************************************
-    def __init__(self, path):
+    def __init__(self, path,initUsers=True):
         self.frameList=[]
         self.userList=[]
         self.nbFrame=0
@@ -32,11 +32,18 @@ class NetworkAnalyzer():
 
         else:
             print("Reading {}".format(path))
+            t=time.time()
             print("Inialisation de l'objet...")
             self.initializeFrameList()
+            print("Temps exec : {} secondes".format(time.time()-t))
             # Initialise la variable userList
-            print("Initialisation de la liste des user...")
-            self.initializeUserList()
+            t2=0
+            if(initUsers==True):
+                print("Initialisation de la liste des user...")
+                t2=time.time()
+                self.initializeUserList()
+                print("Temps exec : {} secondes".format(time.time()-t2))
+            print("Objet construit en {} secondes".format(t+t2))
             print("Analyser built")
     def __del__(self):
         print("Deleting analyser...")
@@ -101,6 +108,27 @@ class NetworkAnalyzer():
             self.userList.append(user)
 
 #************************************ ATTACKS DETECTION METHODS **************************************
+    def detectIpUsurpation(self):
+        start_time=time.time()
+        print("\n"+30*"-"+" DETECTION IP USURPATION " + "-"*30)
+        ipSet=[]
+        suspiscious=False
+        rapport=""
+        for user in self.userList: 
+            for ip in user.ipAddr:
+                if(len(ipSet)==0):
+                    ipSet.append((user.macAddr,ip))
+                else:
+                    for mac, ip2 in ipSet:
+                        if(mac!=user.macAddr and ip2==ip):
+                            rapport+="IP Adresse {} dupplicated on mac {} and {}\n".format(ip2,mac,user.macAddr)
+                            suspiscious=True
+                    ipSet.append((user.macAddr,ip))
+        if(suspiscious):
+            print("\n"+30*"-"+" IP USURPATION DETECTED " + "-"*30)
+            print(rapport)
+        else:
+            print("\n"+30*"-"+" NO IP USURPATION " + "-"*30)
     def detectTcpPortScanWithTrame(self):
         start_time = time.time()
         scan_report= dict()
@@ -454,5 +482,89 @@ class NetworkAnalyzer():
 
         else:
             print('\n'+30*'-'+'NO ARP NETWORK SCAN DETECTED '+30*'-')
+
+        return scan_report
+
+
+    def detectTcpFlood(self, minTcpFrame=10000, nbIpToShow=10):
+        """
+        Detect a TCP flood attack (DDoS/DoS) captured in a pcap file
+
+        ---------- NORMAL 3-WAY HAND-SHAKE ----------
+
+        attacker -----  SYN  ----> target
+        attacker <----SYN-ACK----- target
+        attacker -----  ACK  ----> target
+
+        ---------- SYN FLOOD ATTACK ----------
+
+        Port considered opened:
+
+        attacker -----  SYN  ----> target
+        attacker -----  SYN  ----> target
+        attacker -----  SYN  ----> target
+                        ...
+        
+        attacker <----SYN-ACK----- target
+        attacker <----SYN-ACK----- target
+        attacker <----SYN-ACK----- target
+                        ...
+        
+        Others flags can be used in a TCP flood attack.
+
+        Souces IP can be spoofed. Example of command using hping3:
+        hping3 -c 1000 -d 120 -S -w 64 -p 22 --flood --rand-source ip_target
+
+        Return a report :
+
+        {(ip_target1, port_target1): [nbTcpFrameRcv1, ip_attacker1, start_line1, end_line1],
+        (ip_target2, port_target2): [nbTcpFrameRcv2, ip_attacker2, start_line2, end_line2],
+        ..., 
+        (ip_targetN, port_targetN): [nbTcpFrameRcvN, ip_attackerN, start_lineN, end_lineN]}
+
+        nbTcpFrameRcv (int) is a counter of TCP frame received by the target from all attackers
+        ip_attacker is a list of str, it contains all IP adresses that sent TCP request to the target
+        start_line (int) is the first number of the line that use TCP protocol
+        end_line (int) is the last number of the line that use TCP protocol
+        """
+        t = time.time()
+        scan_report = dict()
+        pcap_file = rdpcap(self.path)
+
+        # Read all frames of the pcap file
+        for i,frame in enumerate(pcap_file):
+            layers = frame.layers()
+
+            if len(layers) > 2 and layers[2].__name__ == 'TCP':
+                ip_src = frame[IP].src
+                ip_dst = frame[IP].dst
+                port_dst = frame[TCP].dport
+
+                if (ip_dst, port_dst) not in scan_report:
+                    scan_report.setdefault((ip_dst, port_dst), [0, set(), 0, 0]) # key: (ip_dst, port_dst) -> [nb_SYN_flag, ip_attackers, start_line, end_line]
+                    scan_report[(ip_dst, port_dst)][2] = i+1
+                scan_report[(ip_dst, port_dst)][0] += 1
+                scan_report[(ip_dst, port_dst)][1].add(ip_src)
+                scan_report[(ip_dst, port_dst)][3] = i+1
+
+        # Display the scan report
+        if scan_report:
+            print('\n'+30*'-'+' TCP FLOOD DETECTED '+30*'-')
+
+            for (ip_dst, port_dst) in scan_report:
+                nbTcpFrameRcv = scan_report[(ip_dst, port_dst)][0]
+                if nbTcpFrameRcv > minTcpFrame:
+                    start_line = scan_report[(ip_dst, port_dst)][2]
+                    end_line = scan_report[(ip_dst, port_dst)][3]
+                    print('\nTarget : {} on port {}'.format(ip_dst, port_dst))
+                    print('{} TCP frames received from line {} to {} (wireshark)'.format(nbTcpFrameRcv, start_line, end_line))
+
+                    if len(scan_report[(ip_dst, port_dst)][1]) < nbIpToShow:
+                        print('IP attacker(s):', ' '.join(scan_report[(ip_dst, port_dst)][1]))
+
+        else:
+            print('\n'+30*'-'+' NO TCP FLOOD DETECTED '+30*'-')
+
+        print('Scanning time: ', str(time.time()-t), ' seconds')
 
         return scan_report
