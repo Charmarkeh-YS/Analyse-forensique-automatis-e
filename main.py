@@ -1,6 +1,5 @@
 import lib_forensique
 from networkAnalyzer import NetworkAnalyzer
-
 def main():
     # -------------------- Test lib_forensique ----------------------
     # --------------------  Uncomment to test   ---------------------
@@ -15,7 +14,8 @@ def main():
 
     # -------------------- Test networkAnalyser ----------------------
     # --------------------  Uncomment to test   ---------------------
-    #handler = NetworkAnalyzer("./Pcaps/synflood.pcap")
+    handler = NetworkAnalyzer("./Pcaps/usurpationIp.pcap")
+    handler.detectIpUsurpation()
     #handler.detectTcpPortScan()
     #handler.detectInverseTcpPortScan()
     #handler.detectUdpPortScan()

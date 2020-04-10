@@ -24,9 +24,12 @@ class User:
         self.snmpCount=0
 
         self.userTramesList=[]
-        self.suspect=False
         self.macAddr=macAddr
-        self.ipAddr=listTrames[0].ip_src             # ATTENTION : LISTE
+        self.ipAddr=[]
+        for trame in listTrames:
+            if(hasattr(trame,"ip_src")):
+                self.ipAddr.append(trame.ip_src)            # ATTENTION : LISTE
+                break
 
         protocoles=[("TCP",self.tcpCount),("UDP",self.udpCount),("IP",self.ipCount),("ARP",self.arpCount),
                 ("DHCP",self.dhcpCount),("NTLM",self.ntlmCount),("SMTP",self.smtpCount),
@@ -42,5 +45,6 @@ class User:
                     new_tuple=(proto[0],proto[1]+1)
                     proto=new_tuple
             # Idée temporaire pour détecter suspiscion de changement suspect d'adresse ip
-            if(trame.ip_src!=self.ipAddr):
-                self.suspect=True
+            if(hasattr(trame,"ip_src")):
+                if(trame.ip_src not in self.ipAddr):
+                    self.ipAddr.append(trame.ip_src)

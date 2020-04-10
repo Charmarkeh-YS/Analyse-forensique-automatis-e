@@ -5,10 +5,10 @@ class Trame:
     def __init__(self,packet,identifiant):
         self.poids=0
         self.id=identifiant
-        print("Creating frame {}...".format(self.id))
+        #print("Creating frame {}...".format(self.id))
         self.layers=packet.layers()
         self.protocol="Ethernet"
-        print(self.layers)
+        #print(self.layers)
         for i,layer in enumerate(self.layers):
             current_layer=layer.__name__
 
@@ -19,8 +19,7 @@ class Trame:
             if(current_layer!="IP" and current_layer!="ARP" and i==1):
                 print("Second layer of frame {} is not IP or ARP -> need an upgrade".format(self.id))
             
-            # -----------------------------------------------------------------------------------------------
-            
+            # ----------------------------------------------------------------------------------------------- 
             functions_layer={
                 "Ether" : self.setEthernetAttributs,
                 "ARP" : self.setArpAttributs,
@@ -33,27 +32,42 @@ class Trame:
                 "ICMP" : self.setIcmpAttributs,
                 "BOOTP" : self.setDhcpAttributs,
                 "DHCP" : self.doNothing,
+                "IPerror": self.setIpErrorAttributs,
+                "UDPerror":self.setUdpErrorAttributs,
+                "IPv6" : self.doNothing,
+                "PPTP" : self.doNothing,
+                "Skinny" : self.doNothing,
             }
-
-            functions_layer[current_layer](packet)
+            try:
+                functions_layer[current_layer](packet)
+            except Exception as e:
+                print("Frame {}".format(self.id))
+                print("Error in functons_layer : {} | Probably an unknown protocol {}".format(e,current_layer))
     def setEthernetAttributs(self,packet):
         self.mac_src=packet["Ethernet"].src
         self.mac_dst=packet["Ethernet"].dst
         self.type=packet["Ethernet"].type
+    def setIpErrorAttributs(self,packet):
+        print("TODO IP ERROR")
+    def setUdpErrorAttributs(self,packet):
+        print("TODO UDP ERROR")
     def setRawAttributs(self,packet):
         self.data=packet["Raw"].load
-        if(self.data[1:3]==b'\x03\x03' or self.data[1:3]==b'\x03\x01'):
-            self.setTlsAttributs(packet)
-        elif(self.port_src==80 or self.port_dst==80):
-            self.setHttpAttributs(packet)
-        elif(self.port_src==23 or self.port_dst==23):
-            self.setTelnetAttributs(packet)
-        elif(self.port_src==22 or self.port_dst==22):
-            self.setSshAttributs(packet)
-        elif(self.port_src==443 or self.port_dst==443):
-            self.setHttpsAttributs(packet)
-        elif(self.port_src==21 or self.port_dst==21):
-            self.setFtpAttributs(packet)
+        if(hasattr(self,"port_src")):
+            if(self.data[1:3]==b'\x03\x03' or self.data[1:3]==b'\x03\x01'):
+                self.setTlsAttributs(packet)
+            elif(self.port_src==80 or self.port_dst==80):
+                self.setHttpAttributs(packet)
+            elif(self.port_src==23 or self.port_dst==23):
+                self.setTelnetAttributs(packet)
+            elif(self.port_src==22 or self.port_dst==22):
+                self.setSshAttributs(packet)
+            elif(self.port_src==443 or self.port_dst==443):
+                self.setHttpsAttributs(packet)
+            elif(self.port_src==21 or self.port_dst==21):
+                self.setFtpAttributs(packet)
+    def setHttpsAttributs(self,packet):
+        self.protocol="HTTPS"
     def setDnsAttributs(self,packet):
         opcodes={
             0:"QUERY",
@@ -68,9 +82,18 @@ class Trame:
             4:"not-implemented",
             5:"refused",
         }
-        self.opcode=opcodes[packet["DNS"].opcode]
-        self.qrcode=qrcodes[packet["DNS"].qr]
-
+        try:
+            self.opcode=opcodes[packet["DNS"].opcode]
+        except Exception as e:
+            print("Frame {}".format(self.id))
+            print("Error in setDnsAttributs : Value incorrect -> fill dict opcodes".format(e,packet["DNS"].opcode))
+            packet.show()
+        try:
+            self.qrcode=qrcodes[packet["DNS"].qr]
+        except Exception as e:
+            print("Frame {}".format(self.id))
+            print("Error in setDnsAttributs : Value incorrect -> fill dict qrcodes".format(e,packet["DNS"].qrcode))
+            packet.show()
         self.protocol="DNS"
         
         self.qdcount=packet["DNS"].qdcount  # DNS Question Record
@@ -101,12 +124,14 @@ class Trame:
             2 : "Offer",
             3 : "Request",
             5 : "Ack",
+            8 : "Bootrequest",
         }
         try:
             self.option=dhcp_options[packet["DHCP options"].options[0][1]]
         except Exception as e:
             print("Frame {}".format(self.id))
             print("Error : {} | Value {} incorrect -> fill dict dhcp_options".format(e,packet["DHCP options"].options[0][1]))
+            packet.show()
     def setArpAttributs(self,packet):
         self.protocol="ARP"
         self.ip_src=packet[self.protocol].psrc
@@ -120,7 +145,7 @@ class Trame:
         except Exception as e:
             print("Frame {}".format(self.id))
             print("Error : {} | Value {} incorrect -> fill dict arp_op".format(e,packet[self.protocol].op))
-
+            packet.show()
     def setIpAttributs(self,packet):
         self.protocol="IP"
         self.ip_src=packet["IP"].src
@@ -153,6 +178,7 @@ class Trame:
         self.protocol="ICMP"
         icmp_types= {
             0 : "Reply",
+            3 : "Destination unreacheable",
             8: "Request",
         }
         try:
@@ -166,3 +192,4 @@ class Trame:
         self.data=packet["Raw"].load
     def doNothing(self,packet):
         pass
+
