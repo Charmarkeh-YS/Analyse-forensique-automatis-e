@@ -3,7 +3,7 @@ from scapy.all import *
 
 
 def main():
-    file_name="./Pcaps/arppoison.pcap"
+    file_name="./Pcaps/ssh_brute_force_attack.pcap"
     packets=rdpcap(file_name)
     list_packets=[]
     for i,packet in enumerate(packets):

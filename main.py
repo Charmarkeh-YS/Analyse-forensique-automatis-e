@@ -10,12 +10,12 @@ def main():
     #lib_forensique.detectTcpUdpFlood(path='Pcaps/synflood.pcap') # Test the detection of TCP SYN flood
     #lib_forensique.detectTcpUdpFlood(path='Pcaps/udpflood.pcap') # Test the detection of UDP flood
     #lib_forensique.detectDnsRequestFlood(path='Pcaps/dns.pcap') # Test the detection of DNS Queries flood
-    lib_forensique.detectHttpGetFlood(path='Pcaps/httpget.pcap') # Test the detection of HTTP GET flood
+    #lib_forensique.detectHttpGetFlood(path='Pcaps/httpget.pcap') # Test the detection of HTTP GET flood
 
     # -------------------- Test networkAnalyser ----------------------
     # --------------------  Uncomment to test   ---------------------
-    handler = NetworkAnalyzer("./Pcaps/usurpationIp.pcap")
-    handler.detectIpUsurpation()
+    handler = NetworkAnalyzer("./Pcaps/ssh.pcap")
+    handler.detectSshBruteForceAttack()
     #handler.detectTcpPortScan()
     #handler.detectInverseTcpPortScan()
     #handler.detectUdpPortScan()
