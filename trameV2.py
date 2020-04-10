@@ -178,7 +178,8 @@ class Trame:
         self.port_src=packet["TCP"].sport
         self.port_dst=packet["TCP"].dport
         self.flags=[flags[x] for x in str(packet["TCP"].flags)]
-
+        self.ack=packet["TCP"].ack
+        self.seq=packet["TCP"].seq
     def setIcmpAttributs(self,packet):
         self.protocol="ICMP"
         icmp_types= {
