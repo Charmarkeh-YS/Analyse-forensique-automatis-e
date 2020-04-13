@@ -1,6 +1,7 @@
 from scapy.all import *
 import time
 import binascii
+import matplotlib.pyplot as plt
 
 def detectTcpPortScan(path):
     """
@@ -644,3 +645,70 @@ def detectHttpGetFlood(path, minFrame=0, maxIpToShow=10): # minFrame=100000, max
     print('Detecting time: ', str(time.time()-t), ' seconds')
 
     return scan_report
+
+
+def detectTcpReset(path):
+    t = time.time()
+    scan_report = dict()
+    pcap_file = rdpcap(path)
+
+    # Read all frames of the pcap file
+    for i,frame in enumerate(pcap_file):
+        layers = frame.layers()
+
+        if len(layers) > 2 and layers[2].__name__ == 'TCP':
+            ip_src = frame[IP].src
+            ip_dst = frame[IP].dst
+            port_src = frame[TCP].sport
+            port_dst = frame[TCP].dport
+
+            # RST flag is set at least
+            if frame[TCP].flags.value & 0x04 == 0x04:
+                scan_report.setdefault(i+1, [ip_src, ip_dst, port_src, port_dst])
+
+    # Display the scan report
+    if scan_report:
+        print('\n'+30*'-'+' TCP RESTET DETECTED '+30*'-')
+
+        for i in scan_report:
+            ip_src = scan_report[i][0]
+            ip_dst = scan_report[i][1]
+            port_src = scan_report[i][2]
+            port_dst = scan_report[i][3]
+
+            print('\nReset flag detected in line {} (wireshark) '.format(i))
+            print('{} -> {}     {} -> {}'.format(ip_src, ip_dst, str(port_src), str(port_dst)))
+
+    else:
+        print('\n'+30*'-'+' NO TCP RESET DETECTED '+30*'-')
+
+    print('\nDetecting time: ', str(time.time()-t), ' seconds')
+
+    return scan_report
+
+
+def showActivity(path):
+    """
+    Display the network activity in frames per seconds.
+
+    Return a pyplot object.
+    """
+    t = time.time()
+    pcap_file = rdpcap(path)
+    time_ref = pcap_file[0].time # Set the time origin
+    x = list(range(0, int(pcap_file[-1].time - time_ref + 1))) # Abcsise of the graph
+    y = [0 for i in x]
+
+    # Read all frames of the pcap file
+    for i,frame in enumerate(pcap_file):
+        y[int(frame.time - time_ref)] += 1
+
+    print('Time: ', str(time.time()-t), ' seconds')
+    
+    plt.plot(x,y)
+    plt.title('Network activity : Frames/s')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Frames')
+    plt.show()
+
+    return plt
