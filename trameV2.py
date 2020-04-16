@@ -8,6 +8,7 @@ class Trame:
         #print("Creating frame {}...".format(self.id))
         self.layers=packet.layers()
         self.protocol="Ethernet"
+        self.time=packet.time
         #print(self.layers)
         for i,layer in enumerate(self.layers):
             current_layer=layer.__name__
@@ -16,8 +17,8 @@ class Trame:
             
             if(current_layer!="Ether" and i==0):
                 print("First layer of frame {} is not ethernet -> need to be checked".format(identifiant))
-            if(current_layer!="IP" and current_layer!="ARP" and i==1):
-                print("Second layer of frame {} is not IP or ARP -> need an upgrade".format(self.id))
+            #if(current_layer!="IP" and current_layer!="ARP" and i==1):
+            #    print("Second layer of frame {} is not IP or ARP -> need an upgrade".format(self.id))
             
             # ----------------------------------------------------------------------------------------------- 
             functions_layer={
@@ -37,6 +38,10 @@ class Trame:
                 "IPv6" : self.doNothing,
                 "PPTP" : self.doNothing,
                 "Skinny" : self.doNothing,
+                "NBNSQueryRequest" : self.doNothing,
+                "NBTDatagram" : self.doNothing,
+                "LLMNRQuery":self.doNothing,
+
             }
             try:
                 functions_layer[current_layer](packet)
@@ -186,6 +191,7 @@ class Trame:
             0 : "Reply",
             3 : "Destination unreacheable",
             8: "Request",
+            13:"Timestamp request",
         }
         try:
             self.icmp_type=icmp_types[packet["ICMP"].type]

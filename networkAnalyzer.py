@@ -35,15 +35,16 @@ class NetworkAnalyzer():
             t=time.time()
             print("Inialisation de l'objet...")
             self.initializeFrameList()
-            print("Temps exec : {} secondes".format(time.time()-t))
+            t1=time.time()-t
+            print("Temps exec : {} secondes".format(t1))
             # Initialise la variable userList
-            t2=0
             if(initUsers==True):
                 print("Initialisation de la liste des user...")
-                t2=time.time()
+                t=time.time()
                 self.initializeUserList()
-                print("Temps exec : {} secondes".format(time.time()-t2))
-            print("Objet construit en {} secondes".format(t+t2))
+                t2=time.time()-t
+                print("Temps exec : {} secondes".format(t2))
+            print("Objet construit en {} secondes".format(t1+t2))
             print("Analyser built")
     def __del__(self):
         print("Deleting analyser...")
@@ -108,6 +109,30 @@ class NetworkAnalyzer():
             self.userList.append(user)
 
 #************************************ ATTACKS DETECTION METHODS **************************************
+    def detectDnsTransferZone(self):
+        start_time=time.time()
+        print("\n"+30*"-"+" DETECTION DNS TRANSFER ZONE " + "-"*30)
+        report=""
+        for frame in self.frameList:
+            if(frame.protocol=="DNS"):
+                if(frame.qdcount!=0):
+                    for qd in frame.qd :
+                        if(qd.qtype==252 or qd.qtype==251): #If it is AXFR or IXFR type
+                            report+=" DNS TRANSFER ZONE DETECTED | FRAME {} | QUERY NAME {} | IP SOURCE {} | MAC SOURCE {}\n".format(frame.id,qd.qname,frame.ip_src,frame.mac_src)
+        print(report)
+        print("-"*90)
+        print("Execution duration : {} secondes.".format(time.time()-start_time))
+
+    def detectArpTableSaturation(self,maxUser=250):
+        # Give the max users allowed on the network
+        start_time=time.time()
+        print("\n"+30*"-"+" DETECTION ARP TABLE SATURATION " + "-"*30)
+        usersOnNetwork=len(self.userList)
+        if(usersOnNetwork>maxUser):
+            print(" ARP TABLE SATURATION SUSPECTED : {} USERS ON THE NETWORK, MAXIMUM {} EXPECTED".format(usersOnNetwork,maxUser))
+        else:
+            print(" NO ARP TABLE SATURATION SUSPECTED : {} USERS ON THE NETWORK, MAXIMUM {} EXPECTED".format(usersOnNetwork,maxUser))
+        print("Execution duration : {} secondes.".format(time.time()-start_time))
     def detectSshBruteForceAttack(self):
         start_time=time.time()
         print("\n"+30*"-"+" DETECTION SSH BRUTE FORCE ATTACK " + "-"*30)
@@ -122,6 +147,7 @@ class NetworkAnalyzer():
                 report+="User with mac adress {} and ip {} is suspect. More than {} try.\n".format(user.macAddr,user.ipAddr,counter*2)
         print(report)
         print("\n"+30*"-"+" DETECTION DONE " + "-"*30)
+        print("Execution duration : {} secondes".format(time.time()-start_time))
     def detectIpUsurpation(self):
         start_time=time.time()
         print("\n"+30*"-"+" DETECTION IP USURPATION " + "-"*30)
@@ -143,6 +169,7 @@ class NetworkAnalyzer():
             print(rapport)
         else:
             print("\n"+30*"-"+" NO IP USURPATION " + "-"*30)
+        print("Execution duration : {} secondes.".format(time.time()-start_time))
     def detectTcpPortScanWithTrame(self):
         start_time = time.time()
         scan_report= dict()

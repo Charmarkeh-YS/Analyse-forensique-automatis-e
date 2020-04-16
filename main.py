@@ -12,12 +12,13 @@ def main():
     #lib_forensique.detectTcpUdpFlood(path='Pcaps/udpflood.pcap') # Test the detection of UDP flood
     #lib_forensique.detectDnsRequestFlood(path='Pcaps/dns.pcap') # Test the detection of DNS Queries flood
     #lib_forensique.detectHttpGetFlood(path='Pcaps/httpget.pcap') # Test the detection of HTTP GET flood
-    #lib_forensique.detectTcpReset(path='Pcaps/tcprst2.pcap') # Test the detection of TCP Reset
-    lib_forensique.showActivity(path='Pcaps/wifi.pcap', ip_src_list=['192.168.1.40', '192.168.1.17'], ip_dst_list=['192.168.1.40', '192.168.1.17'], protocols=['TCP', 'UDP', 'ICMP', 'ARP']) # Test to show the traffic in the network
+    lib_forensique.detectTcpReset(path='Pcaps/tcprst2.pcap') # Test the detection of TCP Reset
+    lib_forensique.showActivity(path='Pcaps/wifi.pcap') # Test to show the traffic in the network
 
     # -------------------- Test networkAnalyser ----------------------
     # --------------------  Uncomment to test   ---------------------
-    #handler = NetworkAnalyzer("./Pcaps/ssh.pcap")
+    handler = NetworkAnalyzer("./Pcaps/wifi.pcap")
+    handler.detectDnsTransferZone()
     #handler.detectSshBruteForceAttack()
     #handler.detectTcpPortScan()
     #handler.detectInverseTcpPortScan()
