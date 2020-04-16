@@ -61,7 +61,7 @@ def detectTcpPortScan(path):
     for frame in pcap_file:
         layers = frame.layers()
 
-        if len(layers) > 2 and layers[2].__name__ == 'TCP':
+        if len(layers) > 2 and layers[2].__name__ == 'TCP' and layers[1].__name__ == 'IP':
             ip_src = frame[IP].src
             ip_dst = frame[IP].dst
             port_src = frame[TCP].sport
@@ -165,7 +165,7 @@ def detectTcpPortScan2(path):
     for frame in pcap_file:
         layers = frame.layers()
 
-        if len(layers) > 2 and layers[2].__name__ == 'TCP':
+        if len(layers) > 2 and layers[2].__name__ == 'TCP' and layers[1].__name__ == 'IP':
             ip_src = frame[IP].src
             ip_dst = frame[IP].dst
             port_src = frame[TCP].sport
@@ -250,7 +250,7 @@ def detectUdpPortScan(path):
         layers = frame.layers()
 
         # Frame sent by the attacker
-        if len(layers) > 2 and layers[2].__name__ == 'UDP':
+        if len(layers) > 2 and layers[2].__name__ == 'UDP' and layers[1].__name__ == 'IP':
             ip_src = frame[IP].src
             ip_dst = frame[IP].dst
             port_dst = frame[UDP].dport
@@ -648,6 +648,9 @@ def detectHttpGetFlood(path, minFrame=0, maxIpToShow=10): # minFrame=100000, max
 
 
 def detectTcpReset(path):
+    """
+    Report all TCP Reset flag in a pcap file and display the source IP, destination IP and the line.
+    """
     t = time.time()
     scan_report = dict()
     pcap_file = rdpcap(path)
@@ -687,28 +690,158 @@ def detectTcpReset(path):
     return scan_report
 
 
-def showActivity(path):
+def showActivity(path, ip_src_list=[], ip_dst_list=[], protocols=[]):
     """
-    Display the network activity in frames per seconds.
+    Display the network activity in frames per seconds, bytes/s and protocols used.
+
+    ip_src_list is a list of str, a graph will be plot for each ip in this list
+    Ex: ip_src_dst = ['192.168.1.1', '192.168.1.2']
+
+    ip_dst_list is a list of str, a graph will be plot for each ip in this list
+    It has the same syntax of ip_src_list
+
+    protocols is a list of str, it display on graphs only protocols (or layers) in graphs
+    Ex: protocols = ['TCP', 'UDP', 'ICMP'], only TCP, UDP and ICMP will be counted for frames/s and bytes/s
 
     Return a pyplot object.
     """
     t = time.time()
     pcap_file = rdpcap(path)
     time_ref = pcap_file[0].time # Set the time origin
-    x = list(range(0, int(pcap_file[-1].time - time_ref + 1))) # Abcsise of the graph
-    y = [0 for i in x]
+
+    x = list(range(0, int(pcap_file[-1].time - time_ref + 1)))
+    y1 = [0 for i in x] # For frames/s
+    y2 = [0 for i in x] # For data/s
+    y3 = dict()         # To count protocols that appear in frames
+
+    ip_src_dict = {ip : [[0 for i in x], [0 for i in x], dict()] for ip in ip_src_list} # dict() to record for each ip_src : frames/s, bytes/s, protocols_used
+    ip_dst_dict = {ip : [[0 for i in x], [0 for i in x], dict()] for ip in ip_dst_list} # dict() to record for each ip_dst : frames/s, bytes/s, protocols_used
 
     # Read all frames of the pcap file
     for i,frame in enumerate(pcap_file):
-        y[int(frame.time - time_ref)] += 1
+        layers = frame.layers()
+
+        # Fill the graph of frames/s and bytes/s according to protocols used
+        for l in layers:
+            protocol = l.__name__
+            if protocols == [] or protocol in protocols:
+                y1[int(frame.time - time_ref)] += 1 # Fill the graph of frames/s
+                y2[int(frame.time - time_ref)] += len(frame) # Fill the graph of bytes/s
+                if protocol not in y3:
+                    y3.setdefault(protocol, 0) # key: Protocol -> 0 (count the number of appatition of the protocol)
+                y3[protocol] += 1
+
+                # Fill the graph of frames/s and bytes/s according to protocols used for each ip_src in ip_src_dict
+                if len(layers) > 1 and layers[1].__name__ == 'IP':
+                    ip_src = frame[IP].src
+                    ip_dst = frame[IP].dst
+
+                    if ip_src in ip_src_dict:
+                        ip_src_dict[ip_src][0][int(frame.time - time_ref)] += 1
+                        ip_src_dict[ip_src][1][int(frame.time - time_ref)] += len(frame)
+                        if protocol not in ip_src_dict[ip_src][2]:
+                            ip_src_dict[ip_src][2].setdefault(protocol, 0) # key: Protocol -> 0 (count the number of appatition of the protocol for each ip_src in ip_src_dict)
+                        ip_src_dict[ip_src][2][protocol] += 1
+
+                    if ip_dst in ip_dst_dict:
+                        ip_dst_dict[ip_dst][0][int(frame.time - time_ref)] += 1
+                        ip_dst_dict[ip_dst][1][int(frame.time - time_ref)] += len(frame)
+                        if protocol not in ip_dst_dict[ip_dst][2]:
+                            ip_dst_dict[ip_dst][2].setdefault(protocol, 0) # key: Protocol -> 0 (count the number of appatition of the protocol for each ip_src in ip_src_dict)
+                        ip_dst_dict[ip_dst][2][protocol] += 1
 
     print('Time: ', str(time.time()-t), ' seconds')
+
+    # --------- Network graphs ----------
     
-    plt.plot(x,y)
-    plt.title('Network activity : Frames/s')
+    plt.figure(num = 'Network graphs')
+    plt.subplots_adjust(hspace = 0.99)
+
+    # Graph for Frames/s
+    plt.subplot(311)
+    plt.plot(x,y1)
+    plt.title('Frames/s')
     plt.xlabel('Time (s)')
     plt.ylabel('Frames')
-    plt.show()
+
+    # Graph for Data/s
+    plt.subplot(312)
+    plt.plot(x,y2)
+    plt.title('Bytes/s')
+    plt.xlabel('Time (s)')
+    plt.ylabel('Data (bytes)')
+
+    # Graph for protocols
+    plt.subplot(313)
+    plt.bar([protocol for protocol in y3], [y3[protocol] for protocol in y3])
+    plt.tick_params(axis = 'x', rotation = 90)
+    plt.title('Number of frame for each protocols/layers')
+    plt.ylabel('Frames')
+
+    # --------- Graphs for each source IP ----------
+
+    for ip in ip_src_dict:
+        y1 = ip_src_dict[ip][0]
+        y2 = ip_src_dict[ip][1]
+        y3 = ip_src_dict[ip][2]
+
+        title = 'Source IP  ' + ip
+        plt.figure(num = title)
+        plt.subplots_adjust(hspace = 0.99)
+
+        # Graph for Frames/s
+        plt.subplot(311)
+        plt.plot(x,y1)
+        plt.title('Frames/s')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Frames')
+
+        # Graph for Data/s
+        plt.subplot(312)
+        plt.plot(x,y2)
+        plt.title('Bytes/s')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Data (bytes)')
+
+        # Graph for protocols
+        plt.subplot(313)
+        plt.bar([protocol for protocol in y3], [y3[protocol] for protocol in y3])
+        plt.tick_params(axis = 'x', rotation = 90)
+        plt.title('Number of frame for each protocols/layers')
+        plt.ylabel('Frames')
+
+    # --------- Graphs for each destination IP ----------
+
+    for ip in ip_dst_dict:
+        y1 = ip_dst_dict[ip][0]
+        y2 = ip_dst_dict[ip][1]
+        y3 = ip_dst_dict[ip][2]
+        
+        title = 'Destination IP  ' + ip
+        plt.figure(num = title)
+        plt.subplots_adjust(hspace = 0.99)
+
+        # Graph for Frames/s
+        plt.subplot(311)
+        plt.plot(x,y1)
+        plt.title('Frames/s')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Frames')
+
+        # Graph for Data/s
+        plt.subplot(312)
+        plt.plot(x,y2)
+        plt.title('Bytes/s')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Data (bytes)')
+
+        # Graph for protocols
+        plt.subplot(313)
+        plt.bar([protocol for protocol in y3], [y3[protocol] for protocol in y3])
+        plt.tick_params(axis = 'x', rotation = 90)
+        plt.title('Number of frame for each protocols/layers')
+        plt.ylabel('Frames')
+
+    plt.show()  # Show all graphs
 
     return plt
