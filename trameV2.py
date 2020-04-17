@@ -10,6 +10,7 @@ class Trame:
         self.protocol="Ethernet"
         self.time=packet.time
         #print(self.layers)
+        #packet.show()
         for i,layer in enumerate(self.layers):
             current_layer=layer.__name__
 
@@ -71,6 +72,11 @@ class Trame:
                 self.setHttpsAttributs(packet)
             elif(self.port_src==21 or self.port_dst==21):
                 self.setFtpAttributs(packet)
+            elif(self.port_src==25 or self.port_dst==25):
+                self.setSmtpAttributs(packet)
+    def setSmtpAttributs(self,packet):
+        self.protocol="SMTP"
+
     def setHttpsAttributs(self,packet):
         self.protocol="HTTPS"
     def setDnsAttributs(self,packet):
